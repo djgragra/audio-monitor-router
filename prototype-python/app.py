@@ -1,4 +1,4 @@
-"""Dante Monitor Router - matrice di ascolto: sorgenti (ingressi Windows) x destinazioni (uscite Windows)."""
+"""Audio Monitor Router - matrice di ascolto: sorgenti (ingressi Windows) x destinazioni (uscite Windows)."""
 import json
 import os
 import sys
@@ -51,7 +51,7 @@ def save_config(cfg):
 class Main(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Dante Monitor Router")
+        self.setWindowTitle("Audio Monitor Router")
         self.cfg = load_config()
         self.routes = {}      # nome destinazione -> Route
         self.active = {}      # nome destinazione -> nome sorgente
