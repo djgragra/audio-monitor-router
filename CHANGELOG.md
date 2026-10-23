@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3 (beta, Windows)
+
+- Fixed: the process that reads the Windows level meters could not start ("WinError 50: the request is not supported"), so the output speakers stayed off. It now gets its own error channel instead of inheriting the one made by Electron, which Windows could not duplicate.
+
+Thanks to Graziano for sending the log that showed it.
+
 ## 0.2.2 (beta, Windows)
 
 - Fixed: the audio engine stopped over and over with "COM method call without VTable". The code that reads Windows' level meters for the output speakers now runs in a **separate small process**: if anything goes wrong there, only the output speakers stop (after three failures it switches them off and says why in the log); the audio engine and the routes are not affected.

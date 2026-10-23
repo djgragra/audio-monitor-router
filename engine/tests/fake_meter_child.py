@@ -4,6 +4,7 @@ import sys
 import threading
 import time
 
+print('hello from the meter child', file=sys.stderr, flush=True)
 names = []
 stop = False
 

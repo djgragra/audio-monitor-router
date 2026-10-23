@@ -35,6 +35,36 @@ class ClientTests(unittest.TestCase):
             c.stop()
         self.assertIsNone(c.proc)
 
+    def test_what_the_child_writes_on_its_error_channel_reaches_our_own(self):
+        c = MeterClient([sys.executable, os.path.join(HERE, "fake_meter_child.py")], enabled=True)
+        err = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(err):
+                wait_for(lambda: c.peaks(["A (B)"]) and "hello from the meter child" in err.getvalue())
+        finally:
+            c.stop()
+        self.assertIn("meters: hello from the meter child", err.getvalue())
+
+    def test_the_child_gets_its_own_error_channel_not_ours(self):
+        # the cause of "WinError 50" on Windows: stderr must be given explicitly, never left to be inherited
+        import unittest.mock as mock
+        c = MeterClient([sys.executable, os.path.join(HERE, "fake_meter_child.py")], enabled=True)
+        real = subprocess.Popen
+        seen = {}
+
+        def spy(*a, **k):
+            seen.update(k)
+            return real(*a, **k)
+
+        try:
+            with mock.patch("amr_engine.meter_client.subprocess.Popen", side_effect=spy):
+                wait_for(lambda: c.peaks(["A (B)"]))
+        finally:
+            c.stop()
+        self.assertEqual(seen.get("stdin"), subprocess.PIPE)
+        self.assertEqual(seen.get("stdout"), subprocess.PIPE)
+        self.assertEqual(seen.get("stderr"), subprocess.PIPE)
+
     def test_a_child_that_keeps_dying_switches_the_feature_off_and_says_why_once(self):
         c = MeterClient([sys.executable, os.path.join(HERE, "fake_crash_child.py")], enabled=True)
         err = io.StringIO()
