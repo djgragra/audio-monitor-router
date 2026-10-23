@@ -152,3 +152,13 @@ class EngineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StdioTests(unittest.TestCase):
+    def test_commands_are_read_as_utf8_whatever_the_system_encoding(self):
+        import subprocess
+        code = ("import sys; sys.path.insert(0, %r); from amr_engine.__main__ import setup_stdio; setup_stdio(); "
+                "print(sys.stdin.readline().strip())") % os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        env = dict(os.environ, PYTHONIOENCODING="cp1252")
+        out = subprocess.run([sys.executable, "-c", code], input="Altoparlanti è così\n".encode("utf-8"), capture_output=True, env=env)
+        self.assertEqual(out.stdout.decode("utf-8").strip(), "Altoparlanti è così")

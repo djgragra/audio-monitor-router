@@ -11,8 +11,51 @@
     "url": "git+https://github.com/djgragra/audio-monitor-router.git"
   },
   "license": "MIT",
-  "private": true,
   "scripts": {
-    "test": "node --test dev/*.test.js"
+    "start": "electron .",
+    "test": "node --test dev/*.test.js",
+    "dist:win": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^44.9.3",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.onairgarage.audiomonitorrouter",
+    "productName": "Audio Monitor Router",
+    "publish": null,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.cjs",
+      "src/**/*",
+      "renderer/**/*",
+      "assets/icon.png",
+      "CHANGELOG.md",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build-engine",
+        "to": "engine"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "artifactName": "Audio-Monitor-Router-Setup-${version}.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "shortcutName": "Audio Monitor Router"
+    }
   }
 }

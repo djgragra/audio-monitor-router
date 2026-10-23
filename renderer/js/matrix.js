@@ -48,13 +48,19 @@ export function setRoute(settings, destination, source) {
   return { ...settings, routes };
 }
 
-/** What to tell the engine so that it matches the wanted routes. */
-export function diffRoutes(running, wanted) {
-  const key = (r) => `${r.destination}\u0000${r.source}`;
-  const have = new Set(running.map(key));
-  const want = new Set(wanted.map(key));
+/** Volume slider (0..100) to linear gain: a squared curve feels more natural than a straight one. */
+export const DEFAULT_VOLUME = 80;
+export const gainFromVolume = (v) => ((Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : DEFAULT_VOLUME) / 100) ** 2;
+
+/**
+ * What to tell the engine so that it matches the wanted routes.
+ * running: { destination: source } as the engine reports; active: [{destination, source}].
+ * A destination that already plays another source is started again (the engine replaces it).
+ */
+export function syncPlan(running, active) {
+  const want = new Map(active.map((r) => [r.destination, r.source]));
   return {
-    start: wanted.filter((r) => !have.has(key(r))),
-    stop: running.filter((r) => !want.has(key(r))),
+    start: active.filter((r) => running[r.destination] !== r.source),
+    stop: Object.keys(running).filter((d) => !want.has(d)),
   };
 }
