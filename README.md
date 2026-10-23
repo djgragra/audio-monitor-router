@@ -2,7 +2,7 @@
 
 A routing matrix for the audio devices of your computer: choose which input you hear and on which output (headphones, monitors, HDMI, another sound card). One source per output, several outputs at the same time, a volume and a level meter for each. It works with any audio device the system exposes, including network audio cards such as Dante Virtual Soundcard receive pairs.
 
-**Status: private beta in progress (0.1.0, Windows first). Not released.** The interface is not written yet; the engine and the matrix logic are.
+**Status: private beta in progress (0.1.0, Windows first). Not released.** The engine, the matrix and the first interface (matrix, volume, meters, names, hide, three languages, theme, Help & About) are written. Not yet: guided update, backup, installers.
 
 ## What it does
 
@@ -26,6 +26,7 @@ A routing matrix for the audio devices of your computer: choose which input you 
 
 ### Not validated
 
+- The interface was opened in Electron on Linux (virtual display, no sound card) and in a browser with a fake engine; never with real devices.
 - Real audio on any system: the engine tests use a fake backend. The earlier prototype was reported working on the author's Windows PC only.
 - Latency, long unattended runs, other drivers and other computers.
 - macOS and Linux (Linux is not planned: the system already has routing tools).
@@ -33,13 +34,14 @@ A routing matrix for the audio devices of your computer: choose which input you 
 ## Run locally
 
 ```
+npm install
 npm test
-python -m amr_engine      # from the engine/ folder; needs Python 3, numpy and sounddevice
+npm start                 # needs Python 3 with numpy and sounddevice (pip install -r engine/requirements.txt)
 ```
 
 ## Structure
 
-`engine/` the audio engine (Python, talks JSON lines) · `src/` interface-side logic (settings, matrix) · `dev/` tests · `docs/PROTOCOL.md` the protocol.
+`main.js`, `preload.cjs` Electron main process and bridge · `renderer/` the interface · `src/` settings, engine client, logs, links · `engine/` the audio engine (Python, JSON lines) · `dev/` tests · `docs/PROTOCOL.md` the protocol.
 
 ## Credits
 

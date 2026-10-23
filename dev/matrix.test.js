@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMatrix, setRoute, diffRoutes } from '../src/matrix.js';
+import { buildMatrix, setRoute, syncPlan, gainFromVolume } from '../renderer/js/matrix.js';
 import { normalize, DEFAULTS } from '../src/settings.js';
 
 // A made-up machine: nothing here is a real device.
@@ -60,9 +60,17 @@ test('one source per destination: a new choice replaces the old one', () => {
   assert.deepEqual(setRoute(s, 's/o', null).routes, {});
 });
 
-test('diffRoutes starts what is missing and stops what is no longer wanted', () => {
+test('syncPlan starts what is missing, restarts a changed source and stops what is no longer wanted', () => {
   const r = (destination, source) => ({ destination, source });
-  const d = diffRoutes([r('x', '1'), r('y', '2')], [r('y', '2'), r('z', '3'), r('x', '9')]);
-  assert.deepEqual(d.start, [r('z', '3'), r('x', '9')]);
-  assert.deepEqual(d.stop, [r('x', '1')]);
+  const p = syncPlan({ x: '1', y: '2', w: '5' }, [r('y', '2'), r('z', '3'), r('x', '9')]);
+  assert.deepEqual(p.start, [r('z', '3'), r('x', '9')]);
+  assert.deepEqual(p.stop, ['w']);
+});
+
+test('volume to gain: squared curve, clamped', () => {
+  assert.equal(gainFromVolume(100), 1);
+  assert.equal(gainFromVolume(0), 0);
+  assert.equal(gainFromVolume(50), 0.25);
+  assert.equal(gainFromVolume(250), 1);
+  assert.ok(Math.abs(gainFromVolume(undefined) - 0.64) < 1e-9);
 });

@@ -11,8 +11,12 @@
     "url": "git+https://github.com/djgragra/audio-monitor-router.git"
   },
   "license": "MIT",
-  "private": true,
   "scripts": {
+    "start": "electron .",
     "test": "node --test dev/*.test.js"
+  },
+  "devDependencies": {
+    "electron": "^44.9.3",
+    "electron-builder": "^26.15.3"
   }
 }
