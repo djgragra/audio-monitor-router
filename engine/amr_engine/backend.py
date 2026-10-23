@@ -9,9 +9,10 @@ class SoundDeviceBackend:
 
     def __init__(self):
         import sounddevice as sd
-        from .meter_client import MeterClient
+        from .meter_client import MeterClient, NamesWatcher
         self.sd = sd
         self.meters = MeterClient()
+        self._names = NamesWatcher()
 
     def endpoint_peaks(self, names):
         """What is playing on each output right now (Windows only; empty elsewhere). Read by a child process."""
@@ -38,13 +39,15 @@ class SoundDeviceBackend:
                 "default_in": api.get("default_input_device") == i,
                 "default_out": api.get("default_output_device") == i,
             })
+        # the meter process loads its endpoints again only when a device really came or went, not at every look
+        if self._names.changed(d["name"] for d in out):
+            self.meters.reset()
         return out
 
     def refresh(self):
         """Ask PortAudio to look at the devices again (it caches the list).
 
         WARNING: this closes every open stream. The engine calls it only when no route is running."""
-        self.meters.reset()
         try:
             self.sd._terminate()
             self.sd._initialize()

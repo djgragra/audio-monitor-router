@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4 (beta, Windows)
+
+- Fixed: the output speakers lit at first and then stopped after about 40 seconds. The meter process crashed (access violation) because of two mistakes in the code that handles Windows' COM objects: it released one reference too many, and it threw away and rebuilt all 32 meters every few seconds. Now the meters get a proper reference, they are rebuilt only when a device is really plugged in or removed, they are never released while the program runs, and the process ends without the clean-up that used to fail.
+
+Thanks to Graziano for the log with the 32 endpoints and the exact crash time.
+
 ## 0.2.3 (beta, Windows)
 
 - Fixed: the process that reads the Windows level meters could not start ("WinError 50: the request is not supported"), so the output speakers stayed off. It now gets its own error channel instead of inheriting the one made by Electron, which Windows could not duplicate.

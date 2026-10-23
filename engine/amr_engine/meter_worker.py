@@ -5,6 +5,7 @@ about five times a second. All COM objects live in this process' main thread, fr
 parent goes away (stdin closes) it exits.
 """
 import json
+import os
 import queue
 import sys
 import threading
@@ -48,3 +49,7 @@ def run():
         peaks = meters.peaks(names) if names else {}
         sys.stdout.write(json.dumps({"peaks": peaks}) + "\n")
         sys.stdout.flush()
+    # End at once, without Python's clean-up: it would release the COM objects one by one at exit, and that
+    # is where this process used to fail with "COM method call without VTable". Windows frees them with the process.
+    sys.stdout.flush()
+    os._exit(0)

@@ -15,6 +15,18 @@ def default_command():
     return [sys.executable, "-m", "amr_engine", "--meters"], os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+class NamesWatcher:
+    """Tells whether the set of device names is not the one seen last time (the first look is never a change)."""
+
+    def __init__(self):
+        self._last = None
+
+    def changed(self, names):
+        now = frozenset(names)
+        was, self._last = self._last, now
+        return was is not None and was != now
+
+
 class MeterClient:
     def __init__(self, command=None, cwd=None, enabled=None):
         if command is None:

@@ -28,10 +28,17 @@ class EndpointMeters:
         self._meters = None      # name key -> COM meter; None = not loaded yet
         self._disabled = False
         self._reported = False
+        self._kept = []          # old meters, never released while the process runs
         self.stats = {}
 
     def reset(self):
-        """The list of devices changed: load the meters again at the next read."""
+        """The list of devices changed: load the meters again at the next read.
+
+        The old meters are NOT released: they are kept until the process ends (which skips the clean-up, see
+        meter_worker). Releasing COM objects while running is what crashed this process; the list changes only when a
+        device is plugged in or removed, so what is kept is a handful of small objects."""
+        if self._meters:
+            self._kept.append(self._meters)
         self._meters = None
 
     def _fail(self, what, exc):
@@ -45,7 +52,6 @@ class EndpointMeters:
         # it from its main thread only, from creation to release.
         self.stats = {"endpoints": 0, "meters": 0, "errors": []}
         try:
-            from ctypes import POINTER, cast
             from comtypes import CLSCTX_ALL, CoInitialize
             from pycaw.pycaw import AudioUtilities, IAudioMeterInformation
             CoInitialize()
@@ -63,7 +69,9 @@ class EndpointMeters:
                     iface = dev.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None)
                     if not iface:
                         raise ValueError("no meter")
-                    meters[_key(name)] = cast(iface, POINTER(IAudioMeterInformation))
+                    # QueryInterface gives a pointer with its own reference; ctypes' cast() did not, and the double release
+                    # that followed crashed this process after a few reloads (access violation 0xC0000005)
+                    meters[_key(name)] = iface.QueryInterface(IAudioMeterInformation)
                 except Exception as e:             # one endpoint without a meter does not matter
                     errors.append(f"{type(e).__name__}: {e}")
             self._meters = meters
