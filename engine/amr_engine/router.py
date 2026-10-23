@@ -5,7 +5,8 @@ import threading
 import numpy as np
 
 from .buffer import DriftBuffer, TARGET_LATENCY_S
-from .monitor import SignalMonitor
+from .endpoint_meter import port_peak
+from .monitor import SignalMonitor, peak_db
 from . import devices as dev
 
 
@@ -105,7 +106,7 @@ class Engine:
         self.specs = {}           # route_id -> {"src", "dst", gain, mute_left, mute_right, mono}: what to restart after a reload
         self.latency_ms = LATENCY_MS["normal"]
         self.monitor = SignalMonitor(backend)
-        self.monitor_ids = []
+        self.watch_ids = []       # ports the interface wants a signal for: sources (own streams) and outputs (system meter)
         self._idle_polls = 0
         self._last_listing = None
         self._warned = {}         # route_id -> (underruns, overruns) already reported
@@ -120,7 +121,7 @@ class Engine:
                 "destinations": [dev.public(p) for p in self.destinations]}
 
     def _apply_monitor(self):
-        wanted = set(self.monitor_ids)
+        wanted = set(self.watch_ids)
         self.monitor.set_ports([p for p in self.sources if p["id"] in wanted])
 
     def _listing_key(self, ev):
@@ -223,8 +224,8 @@ class Engine:
                 return []
             if cmd == "set_latency":
                 return self._set_latency(msg.get("latency"))
-            if cmd == "monitor_sources":
-                self.monitor_ids = [x for x in msg.get("ports", []) if isinstance(x, str)]
+            if cmd == "monitor_ports":
+                self.watch_ids = [x for x in msg.get("ports", []) if isinstance(x, str)]
                 self._apply_monitor()
                 return []
         return [{"event": "error", "message": f"unknown command: {cmd}"}]
@@ -257,9 +258,18 @@ class Engine:
             return {"event": "meters", "levels": {rid: round(r.take_peak_db(), 1) for rid, r in self.routes.items()}}
 
     def signal(self):
-        """Levels of the watched sources, or None when nothing is watched."""
+        """Levels (dB) of the watched ports, or None when there is nothing to report. Sources come from their own
+        streams; outputs from the system meter of the device, which also shows what other programs play on it."""
         with self.lock:
-            return {"event": "signal", "levels": self.monitor.take_levels()} if self.monitor.streams else None
+            levels = self.monitor.take_levels() if self.monitor.streams else {}
+            wanted = set(self.watch_ids)
+            outs = [p for p in self.destinations if p["id"] in wanted]
+            if outs:
+                peaks = self.backend.endpoint_peaks(sorted({p["device_name"] for p in outs})) or {}
+                for p in outs:
+                    if p["device_name"] in peaks:
+                        levels[p["id"]] = peak_db(port_peak(peaks[p["device_name"]], p["channels"]))
+            return {"event": "signal", "levels": levels} if levels else None
 
     def shutdown(self):
         with self.lock:

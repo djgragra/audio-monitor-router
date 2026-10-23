@@ -7,7 +7,12 @@ import math
 
 import numpy as np
 
-MAX_STREAMS = 32          # more than any real machine needs; a limit against a runaway list
+MAX_STREAMS = 32
+
+
+def peak_db(p):
+    """Linear peak (0..1) to dB; silence is -90."""
+    return round(20 * math.log10(p), 1) if p > 1e-6 else -90.0          # more than any real machine needs; a limit against a runaway list
 
 
 class SignalMonitor:
@@ -63,7 +68,7 @@ class SignalMonitor:
         for _, ports in self.streams.values():
             for pid, _ in ports:
                 p = self.peaks.get(pid, 0.0)
-                out[pid] = round(20 * math.log10(p), 1) if p > 1e-6 else -90.0
+                out[pid] = peak_db(p)
         self.peaks = {}
         return out
 

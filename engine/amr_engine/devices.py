@@ -49,18 +49,20 @@ def build_ports(raw_devices):
             dev_id = base if seen[base] == 1 else f"{base}#{seen[base]}"
             port_name, group = split_name(d["name"])
             single = len(channel_ports(nch)) == 1
-            for label, chans in channel_ports(nch):
+            for n, (label, chans) in enumerate(channel_ports(nch)):
                 bucket.append({
                     "id": f"{dev_id}/{label}",
                     "device_id": dev_id,
                     "device_index": d["index"],
+                    "device_name": d["name"],
                     "group": group,
                     "name": port_name if single else f"{port_name} {label}",
                     "kind": kind,
                     "channels": chans,
                     "device_channels": nch,
                     "rate": d.get("rate"),
-                    "default": bool(d.get("default_in" if kind == "input" else "default_out")),
+                    # Windows' default is a whole device; programs play on its first pair
+                    "default": n == 0 and bool(d.get("default_in" if kind == "input" else "default_out")),
                 })
     return sources, destinations
 

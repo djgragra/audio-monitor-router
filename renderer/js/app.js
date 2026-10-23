@@ -59,11 +59,19 @@ function sync() {
 }
 
 // ---- matrix ----
-function nameCell(port, tag) {
+function nameCell(port) {
   const label = state.settings.labels[port.id];
-  const span = h(tag === 'th' ? 'span' : 'span', { class: 'name', title: t('matrix.rename'), ondblclick: () => rename(span, port) },
-    label || port.name, label ? h('small', {}, port.name) : null);
-  return span;
+  const wrap = h('span', { class: 'nm', title: label ? `${label} (${port.name})` : port.name, ondblclick: () => rename(wrap, port) },
+    h('span', { class: 'name' }, label || port.name), label ? h('small', { class: 'orig' }, port.name) : null);
+  return wrap;
+}
+
+/** A label that needs two lines leaves no room for the original name: it is then only in the tooltip. */
+function markLongNames(root) {
+  for (const nm of root.querySelectorAll('.nm')) {
+    const n = nm.querySelector('.name');
+    nm.classList.toggle('long', n.scrollHeight > 20);
+  }
 }
 
 function rename(span, port) {
@@ -114,7 +122,7 @@ async function toggle(srcId, dstId) {
 }
 
 function defaultMark(port) {
-  return port.default ? h('span', { class: 'def', title: t('matrix.default'), 'aria-label': t('matrix.default') }, '●') : null;
+  return port.default ? h('span', { class: 'def', title: t('matrix.default'), 'aria-label': t('matrix.default') }, t('matrix.defaultBadge')) : null;
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -141,13 +149,13 @@ function paintSignal(id, svg, now) {
 setInterval(() => { const now = Date.now(); for (const [id, svg] of state.sigEls) paintSignal(id, svg, now); }, 250);
 
 /** Tells the engine which sources to watch (the visible ones), only when the list changes. */
-function syncMonitor(rows) {
-  const ids = state.settings.showSignal ? rows.flatMap((g) => g.ports.map((p) => p.id)) : [];
+function syncMonitor(rows, columns) {
+  const ids = state.settings.showSignal ? [...rows, ...columns].flatMap((g) => g.ports.map((p) => p.id)) : [];
   const key = ids.join('|');
   if (key === state.watched) return;
   state.watched = key;
   state.tracker.keepOnly(ids);
-  api.engine.send({ cmd: 'monitor_sources', ports: ids });
+  api.engine.send({ cmd: 'monitor_ports', ports: ids });
 }
 
 function render() {
@@ -163,16 +171,16 @@ function render() {
   }
   const cols = m.columns.flatMap((g) => g.ports.map((p) => ({ ...p, group: g.group })));
   const head = h('tr', {}, h('th', { class: 'corner', scope: 'col' }, h('span', { class: 'ell' }, t('matrix.corner'))),
-    cols.map((c) => h('th', { class: 'colhead', scope: 'col' }, h('span', { class: 'grp', title: c.group }, c.group), nameCell(c, 'th'), defaultMark(c), hideButton(c))));
+    cols.map((c) => h('th', { class: 'colhead', scope: 'col' }, h('div', { class: 'grprow' }, h('span', { class: 'grp', title: c.group }, c.group), defaultMark(c), state.settings.showSignal ? speakerIcon(c) : null), h('div', { class: 'rowflex' }, h('span', { class: 'rowname' }, nameCell(c)), hideButton(c)))));
   const body = [];
   for (const g of m.rows) {
     body.push(h('tr', { class: 'grouprow' }, h('th', { class: 'grp-label', scope: 'rowgroup' }, h('span', { class: 'ell', title: g.group }, g.group)), h('td', { colspan: cols.length })));
     for (const s of g.ports) {
-      body.push(h('tr', {}, h('th', { class: 'rowhead', scope: 'row' }, h('div', { class: 'rowflex' }, h('span', { class: 'rowname' }, nameCell(s, 'th'), defaultMark(s)), state.settings.showSignal ? speakerIcon(s) : null, hideButton(s))),
+      body.push(h('tr', {}, h('th', { class: 'rowhead', scope: 'row' }, h('div', { class: 'rowflex' }, h('span', { class: 'rowname' }, nameCell(s), defaultMark(s)), state.settings.showSignal ? speakerIcon(s) : null, hideButton(s))),
         cols.map((c) => {
           const on = state.settings.routes[c.id] === s.id;
           const armed = state.armed && state.armed.src === s.id && state.armed.dst === c.id && Date.now() <= state.armed.until;
-          return h('td', {}, h('button', { class: `cell${armed ? ' warn' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-label': t('matrix.cell', { src: portName(s), dst: portName(c) }), title: armed ? t('loop.cell') : null, onclick: () => toggle(s.id, c.id) }, on ? t('matrix.listen') : armed ? '⚠ ?' : ''));
+          return h('td', {}, h('button', { class: `cell${armed ? ' warn' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-label': t('matrix.cell', { src: portName(s), dst: portName(c) }), title: armed ? t('loop.cell') : null, onclick: () => toggle(s.id, c.id) }, armed ? '⚠ ?' : t('matrix.listen')));
         })));
     }
   }
@@ -195,8 +203,12 @@ function render() {
   };
   const chan = h('tr', { class: 'chan-row' }, h('th', { class: 'ctl-label' }, t('matrix.channels')), cols.map((c) => {
     const cur = state.settings.channels[c.id] || {};
-    const btn = (key, text, title) => h('button', { class: 'tog', type: 'button', 'aria-pressed': String(!!cur[key]), title, 'aria-label': `${title}: ${portName(c)}`, onclick: () => setChan(c.id, { [key]: !cur[key] }) }, text);
-    return h('td', {}, h('div', { class: 'togs' }, btn('muteLeft', 'L', t('chan.muteLeft')), btn('muteRight', 'R', t('chan.muteRight')), btn('mono', 'M', t('chan.mono'))));
+    // L and R are lit while that channel is heard; pressing one leaves it out. MONO is lit while left and right are summed.
+    const btn = (cls, text, title, pressed, patch) => h('button', { class: `tog ${cls}`, type: 'button', 'aria-pressed': String(pressed), title, 'aria-label': `${title}: ${portName(c)}`, onclick: () => setChan(c.id, patch) }, text);
+    return h('td', {}, h('div', { class: 'togs' },
+      btn('lr', 'L', t('chan.left'), !cur.muteLeft, { muteLeft: !cur.muteLeft }),
+      btn('lr', 'R', t('chan.right'), !cur.muteRight, { muteRight: !cur.muteRight }),
+      btn('mono', 'MONO', t('chan.mono'), !!cur.mono, { mono: !cur.mono })));
   }));
   const lvl = h('tr', { class: 'lvl-row' }, h('th', { class: 'ctl-label' }, t('matrix.level')), cols.map((c) => {
     const bar = h('i');
@@ -206,7 +218,8 @@ function render() {
   const kids = [h('table', { class: 'grid' }, h('thead', {}, head), h('tbody', {}, body), h('tfoot', {}, vol, chan, lvl))];
   if (m.dormant.length) kids.push(h('p', { class: 'note' }, t('matrix.dormant', { n: m.dormant.length })));
   root.replaceChildren(...kids);
-  syncMonitor(m.rows);
+  markLongNames(root);
+  syncMonitor(m.rows, m.columns);
 }
 
 // ---- events from the engine ----

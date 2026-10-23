@@ -1,6 +1,6 @@
 {
   "name": "audio-monitor-router",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Routing matrix for the audio devices of a computer: listen to any input on any output",
   "main": "main.js",
   "type": "module",

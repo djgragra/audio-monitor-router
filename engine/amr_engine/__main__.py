@@ -14,7 +14,20 @@ def setup_stdio():
         stream.reconfigure(encoding="utf-8", errors="replace")
 
 
+def selftest():
+    """Used by the Windows build to be sure that everything the engine needs is inside the packaged program."""
+    import numpy  # noqa: F401
+    import sounddevice  # noqa: F401
+    if sys.platform == "win32":
+        from comtypes import CLSCTX_ALL, CoInitialize  # noqa: F401
+        from pycaw.pycaw import AudioUtilities, IAudioMeterInformation  # noqa: F401
+    print("selftest ok")
+    return 0
+
+
 def main():
+    if "--selftest" in sys.argv:
+        sys.exit(selftest())
     setup_stdio()
     from .backend import SoundDeviceBackend
     engine = Engine(SoundDeviceBackend())

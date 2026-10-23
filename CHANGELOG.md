@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1 (beta, Windows)
+
+- The speaker also lights on the **outputs** when Windows plays something on them (a browser on the audio interface, for example). It reads the same level meter Windows shows in its sound settings, so it needs no extra stream. If Windows does not give a meter for an output, that output simply shows no speaker.
+- **L and R** are lit while that channel is heard (both lit = stereo); press one to leave it out. The third button is now **MONO** (left and right summed), because "M" reads as mute to audio people.
+- Every source and output name has room for two lines and the rows have the same height; a longer name is cut and complete in its tooltip. The original name of a source shows under its label only when the label is short.
+- Buttons that are off now say LISTEN in a soft blue, so the matrix is not empty; the one that is on is larger.
+- The first column is wider.
+- The build checks that the packaged engine contains what it needs (`--selftest`).
+
+Thanks to Graziano for the second round of tests.
+
 ## 0.2.0 (beta, Windows)
 
 - A speaker next to every source lights up when that source has audio (like the signal column of Dante Controller). It watches every visible source at once with one extra input each; Settings → General can switch it off.

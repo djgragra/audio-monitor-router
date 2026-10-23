@@ -185,6 +185,11 @@ class EngineTests(unittest.TestCase):
         self.assertEqual([e["event"] for e in self.engine.poll()], ["route_warning"])
         self.assertEqual(self.engine.poll(), [])
 
+    def test_only_the_first_pair_of_a_multichannel_default_is_marked(self):
+        devs = [{"index": 0, "name": "OUT 1-4 (Quad Card)", "hostapi": "API", "max_in": 0, "max_out": 4, "rate": 48000, "default_out": True}]
+        _, dst = dev.build_ports(devs)
+        self.assertEqual([(p["name"], p["default"]) for p in dst], [("OUT 1-4 1-2", True), ("OUT 1-4 3-4", False)])
+
     def test_system_default_output_is_marked(self):
         devs = fake_devices()
         devs[5]["default_out"] = True
@@ -217,3 +222,19 @@ class StdioTests(unittest.TestCase):
         env = dict(os.environ, PYTHONIOENCODING="cp1252")
         out = subprocess.run([sys.executable, "-c", code], input="Altoparlanti è così\n".encode("utf-8"), capture_output=True, env=env)
         self.assertEqual(out.stdout.decode("utf-8").strip(), "Altoparlanti è così")
+
+
+class EndpointMeterLogicTests(unittest.TestCase):
+    def test_port_peak(self):
+        from amr_engine.endpoint_meter import port_peak
+        self.assertEqual(port_peak([0.1, 0.4, 0.9, 0.0], [0, 1]), 0.4)
+        self.assertEqual(port_peak([0.1, 0.4, 0.9, 0.0], [2, 3]), 0.9)
+        self.assertEqual(port_peak([0.3], [2, 3]), 0.3)              # one value for the whole device
+        self.assertEqual(port_peak([], [0, 1]), 0.0)
+        self.assertEqual(port_peak([0.5, 0.5], [4, 5]), 0.0)         # channels the device does not have
+
+    def test_without_windows_nothing_is_read_and_nothing_breaks(self):
+        from amr_engine.endpoint_meter import EndpointMeters
+        m = EndpointMeters()
+        self.assertEqual(m.peaks(["Anything (Card)"]), {})
+        m.reset()
