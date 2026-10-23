@@ -21,15 +21,20 @@ class SoundDeviceBackend:
         for i, d in enumerate(sd.query_devices()):
             if wanted is not None and d["hostapi"] != wanted:
                 continue
+            api = apis[d["hostapi"]]
             out.append({
-                "index": i, "name": d["name"], "hostapi": apis[d["hostapi"]]["name"],
+                "index": i, "name": d["name"], "hostapi": api["name"],
                 "max_in": d["max_input_channels"], "max_out": d["max_output_channels"],
                 "rate": d["default_samplerate"],
+                "default_in": api.get("default_input_device") == i,
+                "default_out": api.get("default_output_device") == i,
             })
         return out
 
     def refresh(self):
-        """Ask PortAudio to look at the devices again (it caches the list)."""
+        """Ask PortAudio to look at the devices again (it caches the list).
+
+        WARNING: this closes every open stream. The engine calls it only when no route is running."""
         try:
             self.sd._terminate()
             self.sd._initialize()
@@ -76,12 +81,13 @@ class FakeBackend:
         self.devices = list(devices)
         self.inputs = {}
         self.outputs = {}
+        self.refreshes = 0
 
     def query(self):
         return [dict(d) for d in self.devices]
 
     def refresh(self):
-        pass
+        self.refreshes += 1
 
     def open_input(self, index, channels, callback):
         s = _FakeStream(callback)

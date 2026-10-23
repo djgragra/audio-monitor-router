@@ -1,12 +1,12 @@
 // The settings overlay: General, Devices, Help & About.
 import { LANGS } from './i18n.js';
 import { SUPPORT_URLS } from './links.js';
+import { describe, moveGroup, movePort } from './matrix.js';
 
 export function renderSettings(box, ctx) {
   const { state, t, h, api, tab, save, redraw, close, found } = ctx;
   const s = state.settings;
   const portById = new Map([...found.sources, ...found.destinations].map((p) => [p.id, p]));
-  const nameOf = (id) => (portById.get(id) ? `${portById.get(id).group} · ${portById.get(id).name}` : id);
 
   const tabs = ['general', 'devices', 'about'].map((k) =>
     h('button', { class: 'tab', type: 'button', role: 'tab', 'aria-selected': String(k === tab), onclick: () => redraw(k) }, t(`tab.${k}`)));
@@ -20,11 +20,42 @@ export function renderSettings(box, ctx) {
     content = [h('div', { class: 'field' }, h('label', { for: 'selLang' }, t('general.language')), lang),
       h('div', { class: 'field' }, h('label', { for: 'selTheme' }, t('general.theme')), theme)];
   } else if (tab === 'devices') {
-    const hidden = s.hidden.map((id) => h('li', {}, h('span', {}, nameOf(id)),
-      h('button', { class: 'btn', type: 'button', onclick: async () => { await save({ hidden: s.hidden.filter((x) => x !== id) }); redraw('devices'); } }, t('devices.show'))));
+    const d = describe(found, s);
+    const arrows = (onUp, onDown, upOff, downOff) => h('span', { class: 'arrows' },
+      h('button', { class: 'arrow', type: 'button', title: t('devices.moveUp'), 'aria-label': t('devices.moveUp'), disabled: upOff, onclick: onUp }, '↑'),
+      h('button', { class: 'arrow', type: 'button', title: t('devices.moveDown'), 'aria-label': t('devices.moveDown'), disabled: downOff, onclick: onDown }, '↓'));
+    const setHidden = async (ids, hide) => {
+      const rest = s.hidden.filter((x) => !ids.includes(x));
+      await save({ hidden: hide ? [...rest, ...ids] : rest });
+      redraw('devices');
+    };
+    const side = (key, title) => {
+      const groups = d[key];
+      const blocks = groups.map((g, gi) => {
+        const shown = g.ports.filter((p) => !p.hiddenByUser && !p.hiddenByCategory).length;
+        const eligible = g.ports.filter((p) => !p.hiddenByCategory);
+        const gbox = h('input', { type: 'checkbox', 'aria-label': t('devices.showGroup'), title: t('devices.showGroup'), disabled: !eligible.length, checked: shown === eligible.length && eligible.length > 0,
+          onchange: (e) => setHidden(eligible.map((p) => p.id), !e.target.checked) });
+        gbox.indeterminate = shown > 0 && shown < eligible.length;
+        const head = h('div', { class: 'dev-group' }, gbox, h('span', {}, g.group),
+          arrows(async () => { await save({ order: moveGroup(found, s, key, g.group, -1) }); redraw('devices'); },
+            async () => { await save({ order: moveGroup(found, s, key, g.group, +1) }); redraw('devices'); }, gi === 0, gi === groups.length - 1));
+        const ports = g.ports.map((p, pi) => h('div', { class: `dev-port${p.hiddenByUser || p.hiddenByCategory ? ' off' : ''}` },
+          h('input', { type: 'checkbox', 'aria-label': `${t('devices.show')}: ${p.label || p.name}`, disabled: p.hiddenByCategory, checked: !p.hiddenByUser && !p.hiddenByCategory,
+            onchange: (e) => setHidden([p.id], !e.target.checked) }),
+          h('span', {}, p.label ? `${p.label} (${p.name})` : p.name, p.default ? ' ●' : '', p.hiddenByCategory ? ` · ${t('devices.hiddenTransmit')}` : ''),
+          arrows(async () => { await save({ order: movePort(found, s, key, p.id, -1) }); redraw('devices'); },
+            async () => { await save({ order: movePort(found, s, key, p.id, +1) }); redraw('devices'); }, pi === 0, pi === g.ports.length - 1)));
+        return h('div', {}, head, ports);
+      });
+      return [h('h3', {}, title), ...blocks];
+    };
     const labels = Object.entries(s.labels);
+    const nameOf = (id) => { const p = portById.get(id); return p ? `${p.group} · ${p.name}` : id; };
     content = [h('p', { class: 'dim' }, t('devices.intro')),
-      h('h3', {}, t('devices.hiddenTitle')), hidden.length ? h('ul', { class: 'list' }, hidden) : h('p', { class: 'dim' }, t('devices.none')),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: s.showNetworkTransmit, onchange: async (e) => { await save({ showNetworkTransmit: e.target.checked }); redraw('devices'); } }), h('span', {}, t('devices.showTransmit'))),
+      h('p', { class: 'dim' }, t('devices.orderHelp')),
+      ...side('sources', t('devices.sources')), ...side('destinations', t('devices.outputs')),
       h('h3', {}, t('devices.labelsTitle')),
       labels.length ? h('ul', { class: 'list' }, labels.map(([id, name]) => h('li', {}, h('span', {}, `${nameOf(id)} → ${name}`)))) : h('p', { class: 'dim' }, t('devices.noLabels')),
       labels.length ? h('button', { class: 'btn', type: 'button', onclick: async () => { await save({ labels: {} }); redraw('devices'); } }, t('devices.clearLabels')) : null];

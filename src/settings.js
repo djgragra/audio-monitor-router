@@ -7,9 +7,14 @@ export const DEFAULTS = Object.freeze({
   hidden: [],          // port ids the user does not want to see
   routes: {},          // destination port id -> source port id
   volumes: {},         // destination port id -> 0..100
+  showNetworkTransmit: false, // show the outputs that only send audio to the network (Dante transmit pairs)
+  order: { sources: { groups: [], ports: [] }, destinations: { groups: [], ports: [] } }, // the user's order
 });
 
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
+
+const strings = (a) => (Array.isArray(a) ? [...new Set(a.filter((x) => typeof x === 'string'))] : []);
+const order = (o) => ({ groups: strings(o?.groups), ports: strings(o?.ports) });
 
 /** Accepts anything read from disk or from a backup and returns valid settings. */
 export function normalize(raw) {
@@ -23,5 +28,7 @@ export function normalize(raw) {
     hidden: Array.isArray(s.hidden) ? [...new Set(s.hidden.filter((x) => typeof x === 'string'))] : [],
     routes: pick(s.routes, (k, v) => typeof v === 'string'),
     volumes: pick(s.volumes, (k, v) => Number.isFinite(v) && v >= 0 && v <= 100),
+    showNetworkTransmit: s.showNetworkTransmit === true,
+    order: { sources: order(s.order?.sources), destinations: order(s.order?.destinations) },
   };
 }

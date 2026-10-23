@@ -42,6 +42,8 @@ function startEngine() {
     ...c,
     onLog: (level, msg) => logger.log(level, msg, 'engine'),
     onEvent: (ev) => {
+      if (ev.event === 'route_warning') logger.log('warn', `buffer: ${ev.underruns} underruns, ${ev.overruns} overruns`, 'route');
+      if (ev.event === 'route_stopped' && ev.reason === 'device_gone') logger.log('warn', 'a device was disconnected', 'route');
       if (ev.event === 'engine_down') {
         logger.log('error', `engine down: ${ev.reason} ${ev.detail || ''}`, 'engine');
         // a crashed engine is restarted, at most 5 times a minute
