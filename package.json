@@ -1,0 +1,18 @@
+{
+  "name": "audio-monitor-router",
+  "version": "0.1.0",
+  "description": "Routing matrix for the audio devices of a computer: listen to any input on any output",
+  "main": "main.js",
+  "type": "module",
+  "author": "Graziano Melzi <hello@onairgarage.com> (https://onairgarage.com)",
+  "homepage": "https://onairgarage.com/tools/audio-monitor-router/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/djgragra/audio-monitor-router.git"
+  },
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "test": "node --test dev/*.test.js"
+  }
+}
