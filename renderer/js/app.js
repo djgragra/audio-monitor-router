@@ -96,6 +96,10 @@ async function toggle(srcId, dstId) {
   sync();
 }
 
+function defaultMark(port) {
+  return port.default ? h('span', { class: 'def', title: t('matrix.default'), 'aria-label': t('matrix.default') }, '●') : null;
+}
+
 function render() {
   const root = $('matrix');
   const m = buildMatrix(state.found, state.settings);
@@ -107,20 +111,20 @@ function render() {
     return;
   }
   const cols = m.columns.flatMap((g) => g.ports.map((p) => ({ ...p, group: g.group })));
-  const head = h('tr', {}, h('th', { class: 'corner', scope: 'col' }, t('matrix.corner')),
-    cols.map((c) => h('th', { class: 'colhead', scope: 'col' }, h('span', { class: 'grp', title: c.group }, c.group), nameCell(c, 'th'), hideButton(c))));
+  const head = h('tr', {}, h('th', { class: 'corner', scope: 'col' }, h('span', { class: 'ell' }, t('matrix.corner'))),
+    cols.map((c) => h('th', { class: 'colhead', scope: 'col' }, h('span', { class: 'grp', title: c.group }, c.group), nameCell(c, 'th'), defaultMark(c), hideButton(c))));
   const body = [];
   for (const g of m.rows) {
-    body.push(h('tr', { class: 'grouprow' }, h('th', { colspan: cols.length + 1, scope: 'colgroup' }, g.group)));
+    body.push(h('tr', { class: 'grouprow' }, h('th', { class: 'grp-label', scope: 'rowgroup' }, h('span', { class: 'ell', title: g.group }, g.group)), h('td', { colspan: cols.length })));
     for (const s of g.ports) {
-      body.push(h('tr', {}, h('th', { class: 'rowhead', scope: 'row' }, nameCell(s, 'th'), hideButton(s)),
+      body.push(h('tr', {}, h('th', { class: 'rowhead', scope: 'row' }, nameCell(s, 'th'), defaultMark(s), hideButton(s)),
         cols.map((c) => {
           const on = state.settings.routes[c.id] === s.id;
           return h('td', {}, h('button', { class: 'cell', type: 'button', 'aria-pressed': String(on), 'aria-label': t('matrix.cell', { src: portName(s), dst: portName(c) }), onclick: () => toggle(s.id, c.id) }, on ? t('matrix.listen') : ''));
         })));
     }
   }
-  const vol = h('tr', {}, h('th', { class: 'ctl-label' }, t('matrix.volume')), cols.map((c) => {
+  const vol = h('tr', { class: 'vol-row' }, h('th', { class: 'ctl-label' }, t('matrix.volume')), cols.map((c) => {
     const slider = h('input', { class: 'vol', type: 'range', min: '0', max: '100', value: String(state.settings.volumes[c.id] ?? DEFAULT_VOLUME), 'aria-label': `${t('matrix.volume')}: ${portName(c)}` });
     let timer;
     slider.addEventListener('input', () => {
@@ -130,12 +134,12 @@ function render() {
     });
     return h('td', {}, slider);
   }));
-  const lvl = h('tr', {}, h('th', { class: 'ctl-label' }, t('matrix.level')), cols.map((c) => {
+  const lvl = h('tr', { class: 'lvl-row' }, h('th', { class: 'ctl-label' }, t('matrix.level')), cols.map((c) => {
     const bar = h('i');
     state.meters.set(c.id, bar);
     return h('td', {}, h('div', { class: 'meter' }, bar));
   }));
-  const kids = [h('table', { class: 'grid' }, h('thead', {}, head), h('tbody', {}, body, vol, lvl))];
+  const kids = [h('table', { class: 'grid' }, h('thead', {}, head), h('tbody', {}, body), h('tfoot', {}, vol, lvl))];
   if (m.dormant.length) kids.push(h('p', { class: 'note' }, t('matrix.dormant', { n: m.dormant.length })));
   root.replaceChildren(...kids);
 }

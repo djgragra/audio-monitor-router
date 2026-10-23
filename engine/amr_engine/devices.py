@@ -60,6 +60,7 @@ def build_ports(raw_devices):
                     "channels": chans,
                     "device_channels": nch,
                     "rate": d.get("rate"),
+                    "default": bool(d.get("default_in" if kind == "input" else "default_out")),
                 })
     return sources, destinations
 

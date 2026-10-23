@@ -124,17 +124,71 @@ class EngineTests(unittest.TestCase):
         self.assertAlmostEqual(float(out[100, 0]), 0.6, places=3)
         self.assertAlmostEqual(float(out[100, 1]), 0.6, places=3)
 
-    def test_device_removed_stops_the_route_and_it_disappears(self):
-        self.engine.handle({"cmd": "start_route", "route_id": "r1", "source": self.src["Net Receive 1-2"],
-                            "destination": self.dst["Speakers"]})
-        self.engine.poll()
-        self.backend.devices = [d for d in self.backend.devices if d["index"] != 3]    # unplug the network card
+    def start(self, rid, src, dst):
+        return self.engine.handle({"cmd": "start_route", "route_id": rid, "source": self.src[src], "destination": self.dst[dst]})
+
+    def unplug(self, device_index):
+        """What the system does: the device leaves the list and its open streams stop."""
+        self.backend.devices = [d for d in self.backend.devices if d["index"] != device_index]
+        for streams in (self.backend.inputs, self.backend.outputs):
+            if device_index in streams:
+                streams[device_index].active = False
+
+    def test_polling_never_closes_streams_while_a_route_plays(self):
+        # the bug of the first beta: looking at the devices again closed every open stream, so sound stopped after 2 s
+        self.start("r1", "Net Receive 1-2", "Speakers")
+        before = self.backend.refreshes
+        for _ in range(5):
+            self.assertEqual(self.engine.poll(), [])
+        self.assertEqual(self.backend.refreshes, before)
+        self.assertTrue(self.engine.routes["r1"].alive)
+
+    def test_unplugged_device_stops_its_route_and_disappears_but_other_routes_go_on(self):
+        self.start("r1", "Net Receive 1-2", "Speakers")
+        self.start("r2", "Mic", "OUT 1-2")
+        self.unplug(3)                                    # the network card
         events = self.engine.poll()
         kinds = [e["event"] for e in events]
-        self.assertEqual(kinds, ["devices", "route_stopped"])
-        self.assertEqual(events[1]["reason"], "device_gone")
-        self.assertNotIn("Net Receive 1-2", [p["name"] for p in events[0]["sources"]])
+        self.assertEqual(kinds, ["route_stopped", "devices"])
+        self.assertEqual(events[0]["reason"], "device_gone")
+        self.assertNotIn("Net Receive 1-2", [p["name"] for p in events[1]["sources"]])
+        self.assertEqual(list(self.engine.routes), ["r2"])
+        self.assertTrue(self.engine.routes["r2"].alive)   # restarted after the new look at the devices
+        self.assertEqual(self.engine.poll(), [])
+
+    def test_refresh_request_keeps_routes_playing(self):
+        self.start("r1", "Net Receive 1-2", "Speakers")
+        events = self.engine.handle({"cmd": "list_devices"})
+        self.assertEqual([e["event"] for e in events], ["devices"])
+        self.assertTrue(self.engine.routes["r1"].alive)
+
+    def test_refresh_request_drops_a_route_whose_device_left(self):
+        self.start("r1", "Net Receive 1-2", "Speakers")
+        self.backend.devices = [d for d in self.backend.devices if d["index"] != 3]     # gone, stream not noticed yet
+        events = self.engine.handle({"cmd": "list_devices"})
+        self.assertEqual([e["event"] for e in events], ["devices", "route_stopped"])
         self.assertEqual(self.engine.routes, {})
+
+    def test_new_device_appears_while_idle(self):
+        self.engine.poll()
+        extra = {"index": 9, "name": "OUT 3-4 (Studio Interface)", "hostapi": "API", "max_in": 0, "max_out": 2, "rate": 48000}
+        self.backend.devices.append(extra)
+        events = self.engine.poll()
+        self.assertEqual([e["event"] for e in events], ["devices"])
+        self.assertIn("OUT 3-4", [p["name"] for p in events[0]["destinations"]])
+
+    def test_buffer_trouble_is_reported_once(self):
+        self.start("r1", "Net Receive 1-2", "Speakers")
+        r = self.engine.routes["r1"]
+        r.dbuf.underruns = 2
+        self.assertEqual([e["event"] for e in self.engine.poll()], ["route_warning"])
+        self.assertEqual(self.engine.poll(), [])
+
+    def test_system_default_output_is_marked(self):
+        devs = fake_devices()
+        devs[5]["default_out"] = True
+        _, dst = dev.build_ports(devs)
+        self.assertEqual([p["name"] for p in dst if p["default"]], ["Speakers"])
 
     def test_device_back_has_the_same_id(self):
         gone = [d for d in self.backend.devices if d["index"] != 3]

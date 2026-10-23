@@ -15,6 +15,8 @@ A routing matrix for the audio devices of your computer: choose which input you 
 
 - Routing between two different devices goes through a small buffer that follows the difference between their clocks, so it adds a delay (target 60 ms, **not measured on real hardware yet**). It is for monitoring, not for recording or live playout.
 - On Windows only shared-mode (WASAPI) endpoints are used, so the app never takes a card away from other programs. Endpoints that Windows lists as separate pairs appear as separate rows; overlapping endpoints of the same card (for example "IN 1-2" and "IN 1-4") are all listed, and you can hide the ones you do not need.
+- A device plugged in while something is playing appears when you press *Refresh devices* (it restarts the running routes for a moment) or as soon as nothing is playing: PortAudio can only look at the devices again by closing every stream. A device that is unplugged is noticed at once, because its stream stops.
+- Outputs of Dante Virtual Soundcard are hidden by default (they only transmit); the system default output is marked with a dot. The app does not read what kind of device an endpoint is (speakers, headphones, HDMI): the audio library does not tell.
 - Two sound cards with exactly the same system name can swap their ids if the system reorders them (not checked on real hardware).
 
 ## Validation and references
@@ -25,6 +27,8 @@ A routing matrix for the audio devices of your computer: choose which input you 
 | `dev/matrix.test.js` | matrix, labels, hidden ports, dormant routes, settings clean-up | passes | `npm test` |
 
 ### Not validated
+
+- A device unplugged during playback: covered by a test with a fake device; not tried with a real one.
 
 - The interface was opened in Electron on Linux (virtual display, no sound card) and in a browser with a fake engine; never with real devices.
 - Real audio on any system: the engine tests use a fake backend. The earlier prototype was reported working on the author's Windows PC only.
