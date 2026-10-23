@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 (beta, Windows)
+
+- Fixed: the audio engine stopped over and over with "COM method call without VTable". The code that reads Windows' level meters for the output speakers now runs in a **separate small process**: if anything goes wrong there, only the output speakers stop (after three failures it switches them off and says why in the log); the audio engine and the routes are not affected.
+- The log now says once how many outputs have a level meter ("endpoint meters: N of M endpoints have a meter") and the first problem, if any. The build prints the same for the build machine.
+
 ## 0.2.1 (beta, Windows)
 
 - The speaker also lights on the **outputs** when Windows plays something on them (a browser on the audio interface, for example). It reads the same level meter Windows shows in its sound settings, so it needs no extra stream. If Windows does not give a meter for an output, that output simply shows no speaker.

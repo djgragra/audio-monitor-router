@@ -9,13 +9,16 @@ class SoundDeviceBackend:
 
     def __init__(self):
         import sounddevice as sd
-        from .endpoint_meter import EndpointMeters
+        from .meter_client import MeterClient
         self.sd = sd
-        self.meters = EndpointMeters()
+        self.meters = MeterClient()
 
     def endpoint_peaks(self, names):
-        """What is playing on each output right now (Windows only; empty elsewhere)."""
+        """What is playing on each output right now (Windows only; empty elsewhere). Read by a child process."""
         return self.meters.peaks(names)
+
+    def close(self):
+        self.meters.stop()
 
     def query(self):
         sd = self.sd
@@ -97,6 +100,9 @@ class FakeBackend:
 
     def endpoint_peaks(self, names):
         return {n: self.peaks[n] for n in names if n in self.peaks}
+
+    def close(self):
+        pass
 
     def refresh(self):
         self.refreshes += 1
