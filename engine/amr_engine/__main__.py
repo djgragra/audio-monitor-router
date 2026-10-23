@@ -7,7 +7,15 @@ import time
 from .router import Engine
 
 
+def setup_stdio():
+    """Commands and events are UTF-8 on every system: Windows would otherwise read stdin as cp1252 and an
+    accented device name would no longer match."""
+    for stream in (sys.stdin, sys.stdout):
+        stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def main():
+    setup_stdio()
     from .backend import SoundDeviceBackend
     engine = Engine(SoundDeviceBackend())
     out_lock = threading.Lock()
