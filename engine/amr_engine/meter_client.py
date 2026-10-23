@@ -32,11 +32,28 @@ class MeterClient:
     # --- process ---
     def _start(self):
         flags = 0x08000000 if sys.platform == "win32" else 0          # CREATE_NO_WINDOW
-        self.proc = subprocess.Popen(self.command, cwd=self.cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                     text=True, encoding="utf-8", bufsize=1, creationflags=flags)
+        common = dict(cwd=self.cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, encoding="utf-8",
+                      errors="replace", bufsize=1, creationflags=flags)
+        # All three channels are our own. Leaving stderr to be inherited failed on Windows with "WinError 50: the request is
+        # not supported": the parent's stderr is a pipe made by Electron that cannot be duplicated for a child.
+        try:
+            self.proc = subprocess.Popen(self.command, stderr=subprocess.PIPE, **common)
+            threading.Thread(target=self._forward_errors, args=(self.proc,), daemon=True).start()
+        except OSError:
+            self.proc = subprocess.Popen(self.command, stderr=subprocess.DEVNULL, **common)
         self._sent = None
         self.latest = {}
         threading.Thread(target=self._read, args=(self.proc,), daemon=True).start()
+
+    @staticmethod
+    def _forward_errors(proc):
+        """What the child writes on its error channel goes to ours, so it reaches the log."""
+        try:
+            for line in proc.stderr:
+                if line.strip():
+                    print(f"meters: {line.rstrip()}", file=sys.stderr, flush=True)
+        except Exception:
+            pass
 
     def _read(self, proc):
         try:
@@ -110,6 +127,8 @@ class MeterClient:
             proc.stdin.close()
             proc.wait(timeout=1.5)
             proc.stdout.close()
+            if proc.stderr:
+                proc.stderr.close()
         except Exception:
             try:
                 proc.kill()
