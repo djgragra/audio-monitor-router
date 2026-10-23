@@ -126,3 +126,36 @@ export function syncPlan(running, active) {
     stop: Object.keys(running).filter((d) => !want.has(d)),
   };
 }
+
+/**
+ * Could routing `src` to `dst` send audio back into where it came from? Cards are the nodes and every route is an
+ * arrow from the card of its source to the card of its destination; a closed circle (an input of a card fed by an
+ * output of the same card, or by a chain that comes back to it) can make a loop, for example through a virtual cable.
+ * It is only a warning: an interface that monitors its own inputs is fine, so the user decides.
+ */
+export function wouldLoop(found, routes, destination, source) {
+  const group = new Map([...found.sources, ...found.destinations].map((p) => [p.id, p.group]));
+  const from = group.get(source);
+  const to = group.get(destination);
+  if (from === undefined || to === undefined) return false;
+  if (from === to) return true;
+  const edges = new Map();
+  for (const [d, sId] of Object.entries(routes)) {
+    if (d === destination) continue;                      // this destination is about to change source
+    const a = group.get(sId);
+    const b = group.get(d);
+    if (a === undefined || b === undefined) continue;
+    if (!edges.has(a)) edges.set(a, new Set());
+    edges.get(a).add(b);
+  }
+  const seen = new Set();
+  const stack = [to];                                     // is there a way back from the destination card to the source card?
+  while (stack.length) {
+    const g = stack.pop();
+    if (g === from) return true;
+    if (seen.has(g)) continue;
+    seen.add(g);
+    for (const next of edges.get(g) || []) stack.push(next);
+  }
+  return false;
+}

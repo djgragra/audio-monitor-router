@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 (beta, Windows)
+
+- A speaker next to every source lights up when that source has audio (like the signal column of Dante Controller). It watches every visible source at once with one extra input each; Settings → General can switch it off.
+- Mute left, mute right and mono (left and right summed) for every output, under the volume.
+- Warning for possible loops: sending an input to an output of the same card, or closing a circle between cards (for example through a virtual cable), needs a second click to confirm.
+- Latency setting: Minimum (30 ms buffer), Normal (60 ms), Safe (120 ms). Applies at once, restarting the running routes.
+- Notification area icon with Open and Quit. Closing the window keeps the listening running there (with a one-time notice); a setting turns this off. Start when signing in to the computer is available and **off** by default; it starts hidden.
+- The window remembers its size and position.
+
 ## 0.1.1 (beta, Windows)
 
 - Fixed: the sound stopped after about a second. The engine looked at the devices again every 2 seconds, and with PortAudio that closes every open stream. It now never does this while something is playing; a device that disappears is noticed because its stream stops, and the other routes are started again.

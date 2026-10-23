@@ -4,15 +4,19 @@ import threading
 
 import numpy as np
 
-from .buffer import DriftBuffer
+from .buffer import DriftBuffer, TARGET_LATENCY_S
+from .monitor import SignalMonitor
 from . import devices as dev
 
 
 class Route:
-    def __init__(self, backend, src, dst, gain=1.0):
-        self.src, self.dst, self.gain = src, dst, gain
+    """One source port heard on one destination port. `opts`: gain, mute_left, mute_right, mono."""
+
+    def __init__(self, backend, src, dst, opts=None, target_s=TARGET_LATENCY_S):
+        self.src, self.dst = src, dst
+        self.opts = {"gain": 1.0, "mute_left": False, "mute_right": False, "mono": False, **(opts or {})}
         self.peak = 0.0
-        self.dbuf = DriftBuffer()
+        self.dbuf = DriftBuffer(target_s=target_s)
         self._in = self._out = None
         try:
             self._in = backend.open_input(src["device_index"], src["device_channels"], self._cb_in)
@@ -23,6 +27,10 @@ class Route:
             self.stop()
             raise
 
+    @property
+    def gain(self):
+        return self.opts["gain"]
+
     def _cb_in(self, indata):
         cols = self.src["channels"]
         pair = indata[:, cols]
@@ -31,7 +39,14 @@ class Route:
         self.dbuf.write(pair)
 
     def _cb_out(self, outdata):
-        d = self.dbuf.read(len(outdata)) * self.gain
+        o = self.opts
+        d = self.dbuf.read(len(outdata)) * o["gain"]
+        if o["mono"]:                                # left and right summed, heard on both sides
+            d[:] = d.mean(axis=1, keepdims=True)
+        if o["mute_left"]:
+            d[:, 0] = 0.0
+        if o["mute_right"]:
+            d[:, 1] = 0.0
         outdata[:] = 0
         cols = self.dst["channels"]
         if len(cols) == 1:                           # mono destination: left and right summed
@@ -60,19 +75,38 @@ class Route:
                     pass
 
 
+LATENCY_MS = {"low": 30, "normal": 60, "safe": 120}
+OPT_KEYS = ("gain", "mute_left", "mute_right", "mono")
+
+
+def _opts(msg):
+    out = {}
+    if "gain" in msg:
+        out["gain"] = float(msg["gain"])
+    for k in ("mute_left", "mute_right", "mono"):
+        if k in msg:
+            out[k] = bool(msg[k])
+    return out
+
+
 class Engine:
     """State of the engine. `handle` takes one command (a dict) and returns the events to send back.
 
     PortAudio can only look at the devices again by closing every stream (see SoundDeviceBackend.refresh),
-    so that is done only when no route is running, or when the user asks for it (`list_devices`), in which
-    case the routes that can still be opened are started again.
+    so that is done only when no route is running (every 2 s, every 6 s while the signal monitor is on, which is
+    stopped and started again around it), or when the user asks for it (`list_devices`), in which case the routes
+    that can still be opened are started again.
     """
 
     def __init__(self, backend):
         self.backend = backend
         self.sources, self.destinations = [], []
         self.routes = {}          # route_id -> Route
-        self.specs = {}           # route_id -> (source id, destination id, gain): what to restart after a reload
+        self.specs = {}           # route_id -> {"src", "dst", gain, mute_left, mute_right, mono}: what to restart after a reload
+        self.latency_ms = LATENCY_MS["normal"]
+        self.monitor = SignalMonitor(backend)
+        self.monitor_ids = []
+        self._idle_polls = 0
         self._last_listing = None
         self._warned = {}         # route_id -> (underruns, overruns) already reported
         self.lock = threading.RLock()
@@ -80,9 +114,14 @@ class Engine:
     # --- devices ---
     def scan(self):
         self.sources, self.destinations = dev.build_ports(self.backend.query())
+        self._apply_monitor()
         return {"event": "devices",
                 "sources": [dev.public(p) for p in self.sources],
                 "destinations": [dev.public(p) for p in self.destinations]}
+
+    def _apply_monitor(self):
+        wanted = set(self.monitor_ids)
+        self.monitor.set_ports([p for p in self.sources if p["id"] in wanted])
 
     def _listing_key(self, ev):
         return ([p["id"] for p in ev["sources"]], [p["id"] for p in ev["destinations"]])
@@ -92,49 +131,66 @@ class Engine:
             r.stop()
         self.routes.clear()
 
-    def reload(self):
-        """Look at the devices again and start again the routes that still make sense."""
+    def _open(self, rid, spec):
+        src = next((p for p in self.sources if p["id"] == spec["src"]), None)
+        dst = next((p for p in self.destinations if p["id"] == spec["dst"]), None)
+        if src is None or dst is None:
+            return "device not present"
+        try:
+            self.routes[rid] = Route(self.backend, src, dst, {k: spec[k] for k in OPT_KEYS}, self.latency_ms / 1000.0)
+        except Exception as e:
+            return str(e)
+        return None
+
+    def _restart_routes(self):
+        """Start again every route in `specs`; returns the events for the ones that cannot be."""
         events = []
-        with self.lock:
-            wanted = dict(self.specs)
-            self._stop_all()
-            self.backend.refresh()
-            ev = self.scan()
-            self._last_listing = self._listing_key(ev)
-            events.append(ev)
-            for rid, (src_id, dst_id, gain) in wanted.items():
-                src = next((p for p in self.sources if p["id"] == src_id), None)
-                dst = next((p for p in self.destinations if p["id"] == dst_id), None)
-                if src is None or dst is None:
-                    self.specs.pop(rid, None)
-                    events.append({"event": "route_stopped", "route_id": rid, "reason": "device_gone"})
-                    continue
-                try:
-                    self.routes[rid] = Route(self.backend, src, dst, gain)
-                except Exception as e:
-                    self.specs.pop(rid, None)
-                    events.append({"event": "route_error", "route_id": rid, "message": str(e)})
+        for rid, spec in list(self.specs.items()):
+            err = self._open(rid, spec)
+            if err == "device not present":
+                self.specs.pop(rid)
+                events.append({"event": "route_stopped", "route_id": rid, "reason": "device_gone"})
+            elif err:
+                self.specs.pop(rid)
+                events.append({"event": "route_error", "route_id": rid, "message": err})
         return events
+
+    def _look_again(self):
+        """Close everything, ask PortAudio for the devices again, open again what still exists."""
+        self._stop_all()
+        self.monitor.stop()
+        self.backend.refresh()
+        ev = self.scan()
+        self._last_listing = self._listing_key(ev)
+        return [ev] + self._restart_routes()
+
+    def reload(self):
+        with self.lock:
+            return self._look_again()
 
     def poll(self):
         """Called every second or two. Nothing here may close a stream that is playing."""
         with self.lock:
             events = []
             dead = [rid for rid, r in self.routes.items() if not r.alive]
-            if dead:
-                for rid in dead:
-                    self.routes.pop(rid).stop()
-                    self.specs.pop(rid, None)
-                    events.append({"event": "route_stopped", "route_id": rid, "reason": "device_gone"})
+            for rid in dead:
+                self.routes.pop(rid).stop()
+                self.specs.pop(rid, None)
+                events.append({"event": "route_stopped", "route_id": rid, "reason": "device_gone"})
+            if dead or not self.monitor.alive:
                 # a stream that died usually means a device went away: look again, and keep the other routes going
-                return events + self.reload()
+                return events + self._look_again()
             if not self.routes:
-                self.backend.refresh()          # safe: nothing is playing
-                ev = self.scan()
-                key = self._listing_key(ev)
-                if key != self._last_listing:
-                    self._last_listing = key
-                    events.append(ev)
+                self._idle_polls += 1
+                if self._idle_polls >= (3 if self.monitor.streams else 1):
+                    self._idle_polls = 0
+                    self.monitor.stop()          # the refresh would close its streams anyway
+                    self.backend.refresh()       # safe: no route is playing
+                    ev = self.scan()
+                    key = self._listing_key(ev)
+                    if key != self._last_listing:
+                        self._last_listing = key
+                        events.append(ev)
             for rid, r in self.routes.items():
                 seen = self._warned.get(rid, (0, 0))
                 now = (r.dbuf.underruns, r.dbuf.overruns)
@@ -158,33 +214,41 @@ class Engine:
                 if r:
                     r.stop()
                 return [{"event": "route_stopped", "route_id": rid, "reason": "requested"}]
-            if cmd == "set_gain":
+            if cmd in ("set_gain", "set_channels"):
                 rid = msg.get("route_id")
-                gain = float(msg.get("gain", 1.0))
                 if rid in self.specs:
-                    self.specs[rid] = (*self.specs[rid][:2], gain)
-                r = self.routes.get(rid)
-                if r:
-                    r.gain = gain
+                    self.specs[rid].update(_opts(msg))
+                if rid in self.routes:
+                    self.routes[rid].opts.update(_opts(msg))
+                return []
+            if cmd == "set_latency":
+                return self._set_latency(msg.get("latency"))
+            if cmd == "monitor_sources":
+                self.monitor_ids = [x for x in msg.get("ports", []) if isinstance(x, str)]
+                self._apply_monitor()
                 return []
         return [{"event": "error", "message": f"unknown command: {cmd}"}]
 
+    def _set_latency(self, name):
+        ms = LATENCY_MS.get(name)
+        if ms is None or ms == self.latency_ms:
+            return []
+        self.latency_ms = ms
+        self._stop_all()                                   # the buffer size is fixed when a route opens: open them again
+        return self._restart_routes()
+
     def _start(self, msg):
         rid = msg.get("route_id")
-        src = next((p for p in self.sources if p["id"] == msg.get("source")), None)
-        dst = next((p for p in self.destinations if p["id"] == msg.get("destination")), None)
-        if src is None or dst is None:
-            return [{"event": "route_error", "route_id": rid, "message": "device not present"}]
+        spec = {"src": msg.get("source"), "dst": msg.get("destination"), "gain": 1.0, "mute_left": False, "mute_right": False, "mono": False}
+        spec.update(_opts(msg))
         old = self.routes.pop(rid, None)
         if old:
             old.stop()
-        gain = float(msg.get("gain", 1.0))
-        try:
-            self.routes[rid] = Route(self.backend, src, dst, gain)
-        except Exception as e:
+        err = self._open(rid, spec)
+        if err:
             self.specs.pop(rid, None)
-            return [{"event": "route_error", "route_id": rid, "message": str(e)}]
-        self.specs[rid] = (src["id"], dst["id"], gain)
+            return [{"event": "route_error", "route_id": rid, "message": err}]
+        self.specs[rid] = spec
         self._warned.pop(rid, None)
         return [{"event": "route_started", "route_id": rid}]
 
@@ -192,7 +256,13 @@ class Engine:
         with self.lock:
             return {"event": "meters", "levels": {rid: round(r.take_peak_db(), 1) for rid, r in self.routes.items()}}
 
+    def signal(self):
+        """Levels of the watched sources, or None when nothing is watched."""
+        with self.lock:
+            return {"event": "signal", "levels": self.monitor.take_levels()} if self.monitor.streams else None
+
     def shutdown(self):
         with self.lock:
             self._stop_all()
+            self.monitor.stop()
             self.specs.clear()

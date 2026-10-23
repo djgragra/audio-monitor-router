@@ -1,7 +1,7 @@
 // Talks to the audio engine process: one JSON object per line on stdin (commands) and stdout (events).
 import { spawn as nodeSpawn } from 'node:child_process';
 
-export const COMMANDS = new Set(['list_devices', 'start_route', 'stop_route', 'set_gain']);
+export const COMMANDS = new Set(['list_devices', 'start_route', 'stop_route', 'set_gain', 'set_channels', 'set_latency', 'monitor_sources']);
 
 export function createEngineClient({ command, args = [], cwd, spawn = nodeSpawn, onEvent, onLog = () => {} }) {
   let child = null;

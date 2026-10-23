@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMatrix, describe, setRoute, syncPlan, gainFromVolume, moveGroup, movePort, isNetworkTransmit } from '../renderer/js/matrix.js';
+import { buildMatrix, describe, setRoute, syncPlan, gainFromVolume, moveGroup, movePort, isNetworkTransmit, wouldLoop } from '../renderer/js/matrix.js';
 import { normalize, DEFAULTS } from '../src/settings.js';
 
 // A made-up machine: nothing here is a real device.
@@ -148,4 +148,34 @@ test('order and the transmit setting are cleaned when read from disk', () => {
   const s = normalize({ showNetworkTransmit: 'yes', order: { sources: { groups: ['A', 3, 'A'], ports: 'x' }, destinations: null } });
   assert.equal(s.showNetworkTransmit, false);
   assert.deepEqual(s.order, { sources: { groups: ['A'], ports: [] }, destinations: { groups: [], ports: [] } });
+});
+
+test('loop guard: an input of a card fed by an output of the same card is flagged', () => {
+  const found = {
+    sources: [mk('cin', 'Virtual Cable', 'Cable Out'), mk('mic', 'Interface', 'In 1')],
+    destinations: [mk('cout', 'Virtual Cable', 'Cable In', 'output'), mk('spk', 'Speakers Card', 'Spk', 'output'), mk('iout', 'Interface', 'Out 1', 'output')],
+  };
+  assert.equal(wouldLoop(found, {}, 'cout', 'cin'), true);           // same card
+  assert.equal(wouldLoop(found, {}, 'spk', 'cin'), false);           // heard on another card: fine
+  assert.equal(wouldLoop(found, {}, 'unknown', 'cin'), false);       // a device that is not there
+});
+
+test('loop guard: a chain of cards that comes back is flagged, a straight chain is not', () => {
+  const found = {
+    sources: [mk('a', 'A', 'in'), mk('b', 'B', 'in'), mk('c', 'C', 'in')],
+    destinations: [mk('da', 'A', 'out', 'output'), mk('db', 'B', 'out', 'output'), mk('dc', 'C', 'out', 'output')],
+  };
+  assert.equal(wouldLoop(found, { db: 'a' }, 'dc', 'b'), false);                // A -> B, then B -> C
+  assert.equal(wouldLoop(found, { db: 'a', dc: 'b' }, 'da', 'c'), true);        // A -> B -> C, and C -> A closes the circle
+  assert.equal(wouldLoop(found, { db: 'a' }, 'db', 'c'), false);                // replacing the source of db: the old arrow does not count
+});
+
+test('settings: latency, channel buttons, signal, tray and login are cleaned and default as agreed', () => {
+  const d = normalize({});
+  assert.deepEqual([d.latency, d.showSignal, d.startAtLogin, d.closeToTray], ['normal', true, false, true]);
+  const s = normalize({ latency: 'turbo', channels: { a: { muteLeft: true, mono: 'x' }, b: 3 }, showSignal: false, startAtLogin: 1, closeToTray: false });
+  assert.equal(s.latency, 'normal');
+  assert.deepEqual(s.channels, { a: { muteLeft: true, muteRight: false, mono: false } });
+  assert.deepEqual([s.showSignal, s.startAtLogin, s.closeToTray], [false, false, false]);
+  assert.equal(normalize({ latency: 'low' }).latency, 'low');
 });

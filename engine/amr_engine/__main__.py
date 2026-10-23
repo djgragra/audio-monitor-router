@@ -32,6 +32,10 @@ def main():
             n += 1
             if engine.routes:
                 emit(engine.meters())
+            if n % 4 == 0:                    # 5 times a second
+                sig = engine.signal()
+                if sig:
+                    emit(sig)
             if n % 40 == 0:                   # every 2 seconds
                 for ev in engine.poll():
                     emit(ev)

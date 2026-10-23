@@ -1,5 +1,6 @@
 import { t as tr } from './i18n.js';
-import { buildMatrix, setRoute, syncPlan, gainFromVolume, DEFAULT_VOLUME } from './matrix.js';
+import { buildMatrix, setRoute, syncPlan, gainFromVolume, wouldLoop, DEFAULT_VOLUME } from './matrix.js';
+import { createSignalTracker } from './signal.js';
 import { renderSettings } from './settings-view.js';
 
 const api = window.api;
@@ -17,7 +18,7 @@ export function h(tag, attrs = {}, ...kids) {
   return el;
 }
 
-const state = { settings: null, found: { sources: [], destinations: [] }, running: {}, meters: new Map() };
+const state = { settings: null, found: { sources: [], destinations: [] }, running: {}, meters: new Map(), tracker: createSignalTracker(), sigEls: new Map(), watched: '', armed: null };
 const t = (key, vars) => tr(state.settings?.language || 'en', key, vars);
 const portName = (p) => state.settings.labels[p.id] || p.name;
 const findPort = (id) => [...state.found.sources, ...state.found.destinations].find((p) => p.id === id);
@@ -48,7 +49,8 @@ function sync() {
   const plan = syncPlan(state.running, m.active);
   for (const r of plan.start) {
     state.running[r.destination] = r.source;
-    api.engine.send({ cmd: 'start_route', route_id: r.destination, source: r.source, destination: r.destination, gain: gainFromVolume(state.settings.volumes[r.destination] ?? DEFAULT_VOLUME) });
+    const ch = state.settings.channels[r.destination] || {};
+    api.engine.send({ cmd: 'start_route', route_id: r.destination, source: r.source, destination: r.destination, gain: gainFromVolume(state.settings.volumes[r.destination] ?? DEFAULT_VOLUME), mute_left: !!ch.muteLeft, mute_right: !!ch.muteRight, mono: !!ch.mono });
   }
   for (const d of plan.stop) {
     delete state.running[d];
@@ -89,8 +91,23 @@ function hideButton(port) {
   return h('button', { class: 'hide-btn', type: 'button', title: t('matrix.hide'), 'aria-label': `${t('matrix.hide')}: ${portName(port)}`, onclick: async () => { await save({ hidden: [...state.settings.hidden, port.id] }); render(); } }, '×');
 }
 
+const ARM_MS = 5000;
+
 async function toggle(srcId, dstId) {
   const on = state.settings.routes[dstId] === srcId;
+  if (!on && wouldLoop(state.found, state.settings.routes, dstId, srcId)) {
+    // a possible loop needs a second click: the first one only warns
+    const a = state.armed;
+    if (!a || a.src !== srcId || a.dst !== dstId || Date.now() > a.until) {
+      state.armed = { src: srcId, dst: dstId, until: Date.now() + ARM_MS };
+      showStatus(t('loop.confirm', { src: portName(findPort(srcId)), dst: portName(findPort(dstId)) }));
+      setTimeout(() => { if (state.armed && Date.now() > state.armed.until - 1) { state.armed = null; showStatus(''); render(); } }, ARM_MS + 50);
+      render();
+      return;
+    }
+    showStatus('');
+  }
+  state.armed = null;
   await save({ routes: setRoute(state.settings, dstId, on ? null : srcId).routes });
   render();
   sync();
@@ -100,10 +117,44 @@ function defaultMark(port) {
   return port.default ? h('span', { class: 'def', title: t('matrix.default'), 'aria-label': t('matrix.default') }, '●') : null;
 }
 
+const SVG = 'http://www.w3.org/2000/svg';
+function speakerIcon(port) {
+  const el = (tag, attrs) => { const e = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+  const svg = el('svg', { viewBox: '0 0 24 24', class: 'sig', role: 'img', 'aria-label': t('signal.off') });
+  svg.append(el('path', { class: 'spk', d: 'M4 9v6h4l5 4V5L8 9H4z' }), el('path', { class: 'wave', d: 'M16 9a4 4 0 0 1 0 6' }), el('path', { class: 'wave', d: 'M18.5 6.5a8 8 0 0 1 0 11' }));
+  state.sigEls.set(port.id, svg);
+  paintSignal(port.id, svg, Date.now());
+  return svg;
+}
+
+function paintSignal(id, svg, now) {
+  const on = state.tracker.state(id, now);
+  svg.classList.toggle('on', on === true);
+  svg.classList.toggle('na', on === null);
+  const label = on ? t('signal.on') : t('signal.off');
+  svg.setAttribute('aria-label', label);
+  let title = svg.querySelector('title');
+  if (!title) { title = document.createElementNS(SVG, 'title'); svg.prepend(title); }
+  title.textContent = label;
+}
+
+setInterval(() => { const now = Date.now(); for (const [id, svg] of state.sigEls) paintSignal(id, svg, now); }, 250);
+
+/** Tells the engine which sources to watch (the visible ones), only when the list changes. */
+function syncMonitor(rows) {
+  const ids = state.settings.showSignal ? rows.flatMap((g) => g.ports.map((p) => p.id)) : [];
+  const key = ids.join('|');
+  if (key === state.watched) return;
+  state.watched = key;
+  state.tracker.keepOnly(ids);
+  api.engine.send({ cmd: 'monitor_sources', ports: ids });
+}
+
 function render() {
   const root = $('matrix');
   const m = buildMatrix(state.found, state.settings);
   state.meters.clear();
+  state.sigEls.clear();
   $('btnRefresh').textContent = t('matrix.refresh');
   $('btnSettings').textContent = t('settings.open');
   if (!m.rows.length && !m.columns.length) {
@@ -117,10 +168,11 @@ function render() {
   for (const g of m.rows) {
     body.push(h('tr', { class: 'grouprow' }, h('th', { class: 'grp-label', scope: 'rowgroup' }, h('span', { class: 'ell', title: g.group }, g.group)), h('td', { colspan: cols.length })));
     for (const s of g.ports) {
-      body.push(h('tr', {}, h('th', { class: 'rowhead', scope: 'row' }, nameCell(s, 'th'), defaultMark(s), hideButton(s)),
+      body.push(h('tr', {}, h('th', { class: 'rowhead', scope: 'row' }, h('div', { class: 'rowflex' }, h('span', { class: 'rowname' }, nameCell(s, 'th'), defaultMark(s)), state.settings.showSignal ? speakerIcon(s) : null, hideButton(s))),
         cols.map((c) => {
           const on = state.settings.routes[c.id] === s.id;
-          return h('td', {}, h('button', { class: 'cell', type: 'button', 'aria-pressed': String(on), 'aria-label': t('matrix.cell', { src: portName(s), dst: portName(c) }), onclick: () => toggle(s.id, c.id) }, on ? t('matrix.listen') : ''));
+          const armed = state.armed && state.armed.src === s.id && state.armed.dst === c.id && Date.now() <= state.armed.until;
+          return h('td', {}, h('button', { class: `cell${armed ? ' warn' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-label': t('matrix.cell', { src: portName(s), dst: portName(c) }), title: armed ? t('loop.cell') : null, onclick: () => toggle(s.id, c.id) }, on ? t('matrix.listen') : armed ? '⚠ ?' : ''));
         })));
     }
   }
@@ -134,14 +186,27 @@ function render() {
     });
     return h('td', {}, slider);
   }));
+  const setChan = async (id, patch) => {
+    const cur = state.settings.channels[id] || { muteLeft: false, muteRight: false, mono: false };
+    const next = { ...cur, ...patch };
+    await save({ channels: { ...state.settings.channels, [id]: next } });
+    api.engine.send({ cmd: 'set_channels', route_id: id, mute_left: next.muteLeft, mute_right: next.muteRight, mono: next.mono });
+    render();
+  };
+  const chan = h('tr', { class: 'chan-row' }, h('th', { class: 'ctl-label' }, t('matrix.channels')), cols.map((c) => {
+    const cur = state.settings.channels[c.id] || {};
+    const btn = (key, text, title) => h('button', { class: 'tog', type: 'button', 'aria-pressed': String(!!cur[key]), title, 'aria-label': `${title}: ${portName(c)}`, onclick: () => setChan(c.id, { [key]: !cur[key] }) }, text);
+    return h('td', {}, h('div', { class: 'togs' }, btn('muteLeft', 'L', t('chan.muteLeft')), btn('muteRight', 'R', t('chan.muteRight')), btn('mono', 'M', t('chan.mono'))));
+  }));
   const lvl = h('tr', { class: 'lvl-row' }, h('th', { class: 'ctl-label' }, t('matrix.level')), cols.map((c) => {
     const bar = h('i');
     state.meters.set(c.id, bar);
     return h('td', {}, h('div', { class: 'meter' }, bar));
   }));
-  const kids = [h('table', { class: 'grid' }, h('thead', {}, head), h('tbody', {}, body), h('tfoot', {}, vol, lvl))];
+  const kids = [h('table', { class: 'grid' }, h('thead', {}, head), h('tbody', {}, body), h('tfoot', {}, vol, chan, lvl))];
   if (m.dormant.length) kids.push(h('p', { class: 'note' }, t('matrix.dormant', { n: m.dormant.length })));
   root.replaceChildren(...kids);
+  syncMonitor(m.rows);
 }
 
 // ---- events from the engine ----
@@ -166,6 +231,14 @@ function onEngine(ev) {
       showStatus(t('status.routeError', { src: src ? portName(src) : '?', dst: dst ? portName(dst) : '?', msg: ev.message }), true);
       break;
     }
+    case 'signal':
+      state.tracker.update(ev.levels, Date.now());
+      break;
+    case 'ready':       // the engine (re)started: it knows nothing yet
+      state.watched = '';
+      api.engine.send({ cmd: 'set_latency', latency: state.settings.latency });
+      api.engine.send({ cmd: 'list_devices' });
+      break;
     case 'meters':
       for (const [id, bar] of state.meters) {
         const db = ev.levels[id];
@@ -198,6 +271,7 @@ async function init() {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
   api.engine.onEvent(onEngine);
   render();
+  api.engine.send({ cmd: 'set_latency', latency: state.settings.latency });
   api.engine.send({ cmd: 'list_devices' });
 }
 init();

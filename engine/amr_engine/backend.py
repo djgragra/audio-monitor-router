@@ -47,9 +47,9 @@ class SoundDeviceBackend:
         except Exception:
             return None
 
-    def open_input(self, index, channels, callback):
+    def open_input(self, index, channels, callback, latency="low"):
         return self.sd.InputStream(device=index, samplerate=SAMPLE_RATE, channels=channels, dtype="float32",
-                                   latency="low", callback=lambda d, f, t, s: callback(d),
+                                   latency=latency, callback=lambda d, f, t, s: callback(d),
                                    extra_settings=self._extra())
 
     def open_output(self, index, channels, callback):
@@ -82,6 +82,7 @@ class FakeBackend:
         self.inputs = {}
         self.outputs = {}
         self.refreshes = 0
+        self.refuse = set()        # device indexes that cannot be opened
 
     def query(self):
         return [dict(d) for d in self.devices]
@@ -89,9 +90,11 @@ class FakeBackend:
     def refresh(self):
         self.refreshes += 1
 
-    def open_input(self, index, channels, callback):
+    def open_input(self, index, channels, callback, latency="low"):
+        if index in self.refuse:
+            raise OSError("device refused")
         s = _FakeStream(callback)
-        self.inputs[index] = s
+        self.inputs.setdefault(index, []).append(s)
         return s
 
     def open_output(self, index, channels, callback):
