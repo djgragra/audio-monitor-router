@@ -27,6 +27,8 @@ class EndpointMeters:
     def __init__(self):
         self._meters = None      # name key -> COM meter; None = not loaded yet
         self._disabled = False
+        self._reported = False
+        self.stats = {}
 
     def reset(self):
         """The list of devices changed: load the meters again at the next read."""
@@ -39,7 +41,9 @@ class EndpointMeters:
         self._meters = {}
 
     def _load(self):
-        # COM objects belong to the thread that creates them: this runs in the engine's ticker thread, and so do the reads
+        # COM objects belong to the thread that creates them. This class lives in the meter child process, which uses
+        # it from its main thread only, from creation to release.
+        self.stats = {"endpoints": 0, "meters": 0, "errors": []}
         try:
             from ctypes import POINTER, cast
             from comtypes import CLSCTX_ALL, CoInitialize
@@ -47,18 +51,29 @@ class EndpointMeters:
             CoInitialize()
             enumerator = AudioUtilities.GetDeviceEnumerator()
             collection = enumerator.EnumAudioEndpoints(EDATAFLOW_ALL, DEVICE_STATE_ACTIVE)
+            total = collection.GetCount()
             meters = {}
-            for i in range(collection.GetCount()):
-                dev = collection.Item(i)
+            errors = []
+            for i in range(total):
                 try:
+                    dev = collection.Item(i)
+                    if not dev:
+                        raise ValueError("empty endpoint")
                     name = AudioUtilities.CreateDevice(dev).FriendlyName
                     iface = dev.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None)
+                    if not iface:
+                        raise ValueError("no meter")
                     meters[_key(name)] = cast(iface, POINTER(IAudioMeterInformation))
-                except Exception:
-                    continue                  # one endpoint without a meter does not matter
+                except Exception as e:             # one endpoint without a meter does not matter
+                    errors.append(f"{type(e).__name__}: {e}")
             self._meters = meters
+            self.stats = {"endpoints": total, "meters": len(meters), "errors": errors[:3]}
+            if not self._reported:                  # once, so the log shows what Windows gave us
+                self._reported = True
+                first = f"; first problem: {errors[0]}" if errors else ""
+                print(f"endpoint meters: {len(meters)} of {total} endpoints have a meter{first}", file=sys.stderr, flush=True)
         except Exception as e:
-            self._fail("load", e)
+            self._fail("load", f"{type(e).__name__}: {e}")
 
     @staticmethod
     def _read(meter):

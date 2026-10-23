@@ -94,6 +94,8 @@ jobs:
           cd engine
           pyinstaller --onefile --name amr-engine --collect-all _sounddevice_data --hidden-import sounddevice --collect-submodules pycaw --collect-submodules comtypes run.py
           ./dist/amr-engine.exe --selftest
+          # information only: what the level meters see on this machine (the log tells us if COM misbehaves)
+          ./dist/amr-engine.exe --meters-list || echo "meters-list exit code $?"
           mkdir -p ../build-engine
           cp dist/amr-engine.exe ../build-engine/amr-engine.exe
 

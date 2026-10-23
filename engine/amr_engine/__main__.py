@@ -28,6 +28,16 @@ def selftest():
 def main():
     if "--selftest" in sys.argv:
         sys.exit(selftest())
+    if "--meters-list" in sys.argv:        # diagnostics: what Windows gives the level meters (used by the build, for the log)
+        from .endpoint_meter import EndpointMeters
+        m = EndpointMeters()
+        m._load()
+        print(json.dumps({"stats": m.stats, "names": sorted((m._meters or {}).keys())}))
+        return
+    if "--meters" in sys.argv:             # the child process that reads the Windows level meters
+        from .meter_worker import run
+        run()
+        return
     setup_stdio()
     from .backend import SoundDeviceBackend
     engine = Engine(SoundDeviceBackend())
@@ -72,6 +82,7 @@ def main():
             emit(ev)
     stop.set()
     engine.shutdown()
+    engine.backend.close()
 
 
 if __name__ == "__main__":
