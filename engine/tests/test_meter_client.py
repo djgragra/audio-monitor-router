@@ -8,7 +8,7 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from amr_engine.meter_client import MAX_FAILURES, MeterClient  # noqa: E402
+from amr_engine.meter_client import MAX_FAILURES, MeterClient, NamesWatcher  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENGINE_DIR = os.path.dirname(HERE)
@@ -100,6 +100,16 @@ class ClientTests(unittest.TestCase):
             self.assertEqual(c.latest, {})
         finally:
             c.stop()
+
+
+class NamesWatcherTests(unittest.TestCase):
+    def test_only_a_real_change_counts(self):
+        w = NamesWatcher()
+        self.assertFalse(w.changed(["A", "B"]))               # the first look is not a change
+        self.assertFalse(w.changed(["B", "A"]))               # same devices, another order
+        self.assertTrue(w.changed(["A", "B", "C"]))           # a device came
+        self.assertFalse(w.changed(["A", "B", "C"]))
+        self.assertTrue(w.changed(["A", "C"]))                # a device went
 
 
 class WorkerTests(unittest.TestCase):
