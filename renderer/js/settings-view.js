@@ -17,8 +17,16 @@ export function renderSettings(box, ctx) {
       LANGS.map((l) => h('option', { value: l, selected: l === s.language }, { en: 'English', it: 'Italiano', es: 'Español' }[l])));
     const theme = h('select', { id: 'selTheme', onchange: async (e) => { await save({ theme: e.target.value }); redraw('general'); } },
       ['dark', 'light', 'system'].map((k) => h('option', { value: k, selected: k === s.theme }, t(`theme.${k}`))));
+    const lat = h('select', { id: 'selLat', onchange: async (e) => { await save({ latency: e.target.value }); api.engine.send({ cmd: 'set_latency', latency: e.target.value }); redraw('general'); } },
+      ['low', 'normal', 'safe'].map((k) => h('option', { value: k, selected: k === s.latency }, t(`latency.${k}`))));
+    const check = (key, textKey, after) => h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!s[key], onchange: async (e) => { await save({ [key]: e.target.checked }); if (after) after(); redraw('general'); } }), h('span', {}, t(textKey)));
     content = [h('div', { class: 'field' }, h('label', { for: 'selLang' }, t('general.language')), lang),
-      h('div', { class: 'field' }, h('label', { for: 'selTheme' }, t('general.theme')), theme)];
+      h('div', { class: 'field' }, h('label', { for: 'selTheme' }, t('general.theme')), theme),
+      h('div', { class: 'field' }, h('label', { for: 'selLat' }, t('general.latency')), lat),
+      h('p', { class: 'hint' }, t('latency.help')),
+      check('showSignal', 'general.showSignal', () => { state.watched = '\0'; }),
+      check('startAtLogin', 'general.startAtLogin'),
+      check('closeToTray', 'general.closeToTray')];
   } else if (tab === 'devices') {
     const d = describe(found, s);
     const arrows = (onUp, onDown, upOff, downOff) => h('span', { class: 'arrows' },

@@ -90,13 +90,13 @@ class EngineTests(unittest.TestCase):
         self.dst = {p["name"]: p["id"] for p in ev["destinations"]}
 
     def feed(self, device_index, frames_by_channel, blocks=12):
-        s = self.backend.inputs[device_index]
         n = len(frames_by_channel)
         for _ in range(blocks):
             block = np.zeros((480, n), np.float32)
             for c, v in enumerate(frames_by_channel):
                 block[:, c] = v
-            s.callback(block)
+            for s in self.backend.inputs[device_index]:        # the route and the monitor hear the same thing
+                s.callback(block)
 
     def pull(self, device_index, channels, n=256):
         out = np.zeros((n, channels), np.float32)
@@ -130,9 +130,10 @@ class EngineTests(unittest.TestCase):
     def unplug(self, device_index):
         """What the system does: the device leaves the list and its open streams stop."""
         self.backend.devices = [d for d in self.backend.devices if d["index"] != device_index]
-        for streams in (self.backend.inputs, self.backend.outputs):
-            if device_index in streams:
-                streams[device_index].active = False
+        for s in self.backend.inputs.get(device_index, []):
+            s.active = False
+        if device_index in self.backend.outputs:
+            self.backend.outputs[device_index].active = False
 
     def test_polling_never_closes_streams_while_a_route_plays(self):
         # the bug of the first beta: looking at the devices again closed every open stream, so sound stopped after 2 s
