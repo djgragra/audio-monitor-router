@@ -1,2 +1,3 @@
 sounddevice
 numpy
+pycaw; sys_platform == "win32"

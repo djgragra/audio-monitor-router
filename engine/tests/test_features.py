@@ -26,7 +26,7 @@ class Base(unittest.TestCase):
         self.dst = {p["name"]: p["id"] for p in ev["destinations"]}
 
     def watch(self, *names):
-        self.engine.handle({"cmd": "monitor_sources", "ports": [self.src[n] for n in names]})
+        self.engine.handle({"cmd": "monitor_ports", "ports": [self.src[n] for n in names]})
 
     def feed(self, device_index, values, blocks=12):
         for _ in range(blocks):
@@ -105,6 +105,44 @@ class SignalTests(Base):
         self.engine.handle({"cmd": "list_devices"})
         self.assertEqual(list(self.engine.monitor.streams), [2])
         self.assertTrue(self.engine.routes["r1"].alive)
+
+
+class OutputSignalTests(Base):
+    def watch_out(self, *names):
+        self.engine.handle({"cmd": "monitor_ports", "ports": [self.dst[n] for n in names]})
+
+    def test_what_the_system_plays_on_an_output_lights_it(self):
+        self.backend.peaks = {"OUT 1-2 (Studio Interface)": [0.5, 0.5]}       # a browser playing on the interface
+        self.watch_out("OUT 1-2", "Speakers")
+        lv = self.engine.signal()["levels"]
+        self.assertAlmostEqual(lv[self.dst["OUT 1-2"]], -6.0, delta=0.1)
+        self.assertNotIn(self.dst["Speakers"], lv)                            # no data for that device: no speaker
+
+    def test_pairs_of_a_multichannel_output_have_their_own_level(self):
+        devs = fake_devices() + [{"index": 8, "name": "OUT 1-4 (Quad Card)", "hostapi": "API", "max_in": 0, "max_out": 4, "rate": 48000}]
+        self.backend.devices = devs
+        ev = self.engine.scan()
+        dst = {p["name"]: p["id"] for p in ev["destinations"]}
+        self.backend.peaks = {"OUT 1-4 (Quad Card)": [0.5, 0.5, 0.0, 0.0]}
+        self.engine.handle({"cmd": "monitor_ports", "ports": [dst["OUT 1-4 1-2"], dst["OUT 1-4 3-4"]]})
+        lv = self.engine.signal()["levels"]
+        self.assertAlmostEqual(lv[dst["OUT 1-4 1-2"]], -6.0, delta=0.1)
+        self.assertEqual(lv[dst["OUT 1-4 3-4"]], -90.0)
+
+    def test_a_single_value_for_the_device_is_used_for_every_port(self):
+        self.backend.peaks = {"Speakers (Onboard Audio)": [0.25]}
+        self.watch_out("Speakers")
+        self.assertAlmostEqual(self.engine.signal()["levels"][self.dst["Speakers"]], -12.0, delta=0.1)
+
+    def test_sources_and_outputs_are_reported_together(self):
+        self.backend.peaks = {"Speakers (Onboard Audio)": [0.5, 0.5]}
+        self.engine.handle({"cmd": "monitor_ports", "ports": [self.src["Mic"], self.dst["Speakers"]]})
+        self.feed(2, [0.5], blocks=1)
+        lv = self.engine.signal()["levels"]
+        self.assertEqual(set(lv), {self.src["Mic"], self.dst["Speakers"]})
+
+    def test_nothing_watched_nothing_reported(self):
+        self.assertIsNone(self.engine.signal())
 
 
 class ChannelTests(Base):

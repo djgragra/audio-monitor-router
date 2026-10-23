@@ -51,7 +51,7 @@ export function renderSettings(box, ctx) {
         const ports = g.ports.map((p, pi) => h('div', { class: `dev-port${p.hiddenByUser || p.hiddenByCategory ? ' off' : ''}` },
           h('input', { type: 'checkbox', 'aria-label': `${t('devices.show')}: ${p.label || p.name}`, disabled: p.hiddenByCategory, checked: !p.hiddenByUser && !p.hiddenByCategory,
             onchange: (e) => setHidden([p.id], !e.target.checked) }),
-          h('span', {}, p.label ? `${p.label} (${p.name})` : p.name, p.default ? ' ●' : '', p.hiddenByCategory ? ` · ${t('devices.hiddenTransmit')}` : ''),
+          h('span', {}, p.label ? `${p.label} (${p.name})` : p.name, p.default ? ` · ${t('matrix.default')}` : '', p.hiddenByCategory ? ` · ${t('devices.hiddenTransmit')}` : ''),
           arrows(async () => { await save({ order: movePort(found, s, key, p.id, -1) }); redraw('devices'); },
             async () => { await save({ order: movePort(found, s, key, p.id, +1) }); redraw('devices'); }, pi === 0, pi === g.ports.length - 1)));
         return h('div', {}, head, ports);

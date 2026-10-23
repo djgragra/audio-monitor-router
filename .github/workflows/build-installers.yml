@@ -90,9 +90,10 @@ jobs:
       - name: Build the audio engine (one program, no Python needed on the user's computer)
         shell: bash
         run: |
-          pip install numpy sounddevice pyinstaller
+          pip install numpy sounddevice pycaw pyinstaller
           cd engine
-          pyinstaller --onefile --name amr-engine --collect-all _sounddevice_data --hidden-import sounddevice run.py
+          pyinstaller --onefile --name amr-engine --collect-all _sounddevice_data --hidden-import sounddevice --collect-submodules pycaw --collect-submodules comtypes run.py
+          ./dist/amr-engine.exe --selftest
           mkdir -p ../build-engine
           cp dist/amr-engine.exe ../build-engine/amr-engine.exe
 

@@ -15,9 +15,9 @@ export const TEXT = {
     'tab.general': 'General', 'tab.devices': 'Devices', 'tab.about': 'Help & About',
     'general.language': 'Language', 'general.theme': 'Theme', 'theme.dark': 'Dark', 'theme.light': 'Light', 'theme.system': 'Follow the system',
     
-    'matrix.default': 'System default output',
+    'matrix.default': 'System default (the one Windows uses unless a program chooses another)', 'matrix.defaultBadge': 'DEFAULT',
     'signal.on': 'Signal present', 'signal.off': 'No signal',
-    'matrix.channels': 'Channels', 'chan.muteLeft': 'Mute left', 'chan.muteRight': 'Mute right', 'chan.mono': 'Mono (left and right summed)',
+    'matrix.channels': 'Channels', 'chan.left': 'Left channel (lit = heard, press to leave it out)', 'chan.right': 'Right channel (lit = heard, press to leave it out)', 'chan.mono': 'Mono: left and right summed',
     'loop.confirm': 'Possible loop: {src} → {dst} can send audio back into the card it comes from. Click again to confirm.',
     'loop.cell': 'Possible loop',
     'general.latency': 'Latency', 'latency.low': 'Minimum (30 ms buffer)', 'latency.normal': 'Normal (60 ms buffer)', 'latency.safe': 'Safe (120 ms buffer)',
@@ -38,7 +38,7 @@ export const TEXT = {
     'about.privacy': 'Privacy: the app contacts no address by itself. It only reads and plays the audio of this computer; it never changes network subscriptions or the settings of your sound cards.',
     'about.copySupport': 'Copy support info', 'about.copied': 'Copied', 'about.openLogs': 'Open logs folder',
     'about.unsigned': 'The installers are not signed. Windows may show "Windows protected your PC" (More info, then Run anyway); macOS may ask you to confirm the first launch in System Settings, Privacy & Security.',
-    'about.credits': 'Credits: Electron (MIT), NumPy (BSD-3-Clause), python-sounddevice (MIT) with PortAudio.',
+    'about.credits': 'Credits: Electron (MIT), NumPy (BSD-3-Clause), python-sounddevice (MIT) with PortAudio, pycaw and comtypes (MIT).',
     'tip.text': 'Useful to you? A coffee for the mechanics is always welcome.', 'tip.btn': 'Tip jar',
   },
   it: {
@@ -54,9 +54,9 @@ export const TEXT = {
     'tab.general': 'Generale', 'tab.devices': 'Dispositivi', 'tab.about': 'Guida e info',
     'general.language': 'Lingua', 'general.theme': 'Tema', 'theme.dark': 'Scuro', 'theme.light': 'Chiaro', 'theme.system': 'Segui il sistema',
     
-    'matrix.default': 'Uscita predefinita del sistema',
+    'matrix.default': 'Predefinita del sistema (quella che Windows usa se un programma non ne sceglie un\'altra)', 'matrix.defaultBadge': 'PREDEF.',
     'signal.on': 'Segnale presente', 'signal.off': 'Nessun segnale',
-    'matrix.channels': 'Canali', 'chan.muteLeft': 'Silenzia sinistra', 'chan.muteRight': 'Silenzia destra', 'chan.mono': 'Mono (sinistra e destra sommate)',
+    'matrix.channels': 'Canali', 'chan.left': 'Canale sinistro (acceso = si sente, premi per escluderlo)', 'chan.right': 'Canale destro (acceso = si sente, premi per escluderlo)', 'chan.mono': 'Mono: sinistra e destra sommate',
     'loop.confirm': 'Possibile loop: {src} → {dst} può rimandare l\'audio nella scheda da cui arriva. Fai clic ancora per confermare.',
     'loop.cell': 'Possibile loop',
     'general.latency': 'Latenza', 'latency.low': 'Minima (buffer di 30 ms)', 'latency.normal': 'Normale (buffer di 60 ms)', 'latency.safe': 'Sicura (buffer di 120 ms)',
@@ -77,7 +77,7 @@ export const TEXT = {
     'about.privacy': 'Privacy: l\'app non contatta nessun indirizzo da sola. Legge e riproduce soltanto l\'audio di questo computer; non cambia le sottoscrizioni di rete né le impostazioni delle tue schede audio.',
     'about.copySupport': 'Copia info per il supporto', 'about.copied': 'Copiato', 'about.openLogs': 'Apri la cartella dei log',
     'about.unsigned': 'Gli installer non sono firmati. Windows può mostrare "Windows ha protetto il PC" (Ulteriori informazioni, poi Esegui comunque); macOS può chiederti di confermare il primo avvio in Impostazioni di Sistema, Privacy e sicurezza.',
-    'about.credits': 'Crediti: Electron (MIT), NumPy (BSD-3-Clause), python-sounddevice (MIT) con PortAudio.',
+    'about.credits': 'Crediti: Electron (MIT), NumPy (BSD-3-Clause), python-sounddevice (MIT) con PortAudio, pycaw e comtypes (MIT).',
     'tip.text': 'Ti è utile? Un caffè per i meccanici è sempre ben accetto.', 'tip.btn': 'Salvadanaio',
   },
   es: {
@@ -93,9 +93,9 @@ export const TEXT = {
     'tab.general': 'General', 'tab.devices': 'Dispositivos', 'tab.about': 'Ayuda e info',
     'general.language': 'Idioma', 'general.theme': 'Tema', 'theme.dark': 'Oscuro', 'theme.light': 'Claro', 'theme.system': 'Seguir el sistema',
     
-    'matrix.default': 'Salida predeterminada del sistema',
+    'matrix.default': 'Predeterminada del sistema (la que Windows usa si un programa no elige otra)', 'matrix.defaultBadge': 'PREDET.',
     'signal.on': 'Señal presente', 'signal.off': 'Sin señal',
-    'matrix.channels': 'Canales', 'chan.muteLeft': 'Silenciar izquierda', 'chan.muteRight': 'Silenciar derecha', 'chan.mono': 'Mono (izquierda y derecha sumadas)',
+    'matrix.channels': 'Canales', 'chan.left': 'Canal izquierdo (encendido = se oye, pulsa para excluirlo)', 'chan.right': 'Canal derecho (encendido = se oye, pulsa para excluirlo)', 'chan.mono': 'Mono: izquierda y derecha sumadas',
     'loop.confirm': 'Posible bucle: {src} → {dst} puede devolver el audio a la tarjeta de la que viene. Haz clic otra vez para confirmar.',
     'loop.cell': 'Posible bucle',
     'general.latency': 'Latencia', 'latency.low': 'Mínima (búfer de 30 ms)', 'latency.normal': 'Normal (búfer de 60 ms)', 'latency.safe': 'Segura (búfer de 120 ms)',
@@ -116,7 +116,7 @@ export const TEXT = {
     'about.privacy': 'Privacidad: la app no contacta ninguna dirección por sí sola. Solo lee y reproduce el audio de este equipo; nunca cambia las suscripciones de red ni los ajustes de tus tarjetas de sonido.',
     'about.copySupport': 'Copiar info para soporte', 'about.copied': 'Copiado', 'about.openLogs': 'Abrir la carpeta de registros',
     'about.unsigned': 'Los instaladores no están firmados. Windows puede mostrar "Windows protegió tu PC" (Más información, luego Ejecutar de todas formas); macOS puede pedirte que confirmes el primer arranque en Ajustes del Sistema, Privacidad y seguridad.',
-    'about.credits': 'Créditos: Electron (MIT), NumPy (BSD-3-Clause), python-sounddevice (MIT) con PortAudio.',
+    'about.credits': 'Créditos: Electron (MIT), NumPy (BSD-3-Clause), python-sounddevice (MIT) con PortAudio, pycaw y comtypes (MIT).',
     'tip.text': '¿Te resulta útil? Un café para los mecánicos siempre es bienvenido.', 'tip.btn': 'Hucha',
   },
 };

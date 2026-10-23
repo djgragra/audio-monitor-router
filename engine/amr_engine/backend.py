@@ -9,7 +9,13 @@ class SoundDeviceBackend:
 
     def __init__(self):
         import sounddevice as sd
+        from .endpoint_meter import EndpointMeters
         self.sd = sd
+        self.meters = EndpointMeters()
+
+    def endpoint_peaks(self, names):
+        """What is playing on each output right now (Windows only; empty elsewhere)."""
+        return self.meters.peaks(names)
 
     def query(self):
         sd = self.sd
@@ -35,6 +41,7 @@ class SoundDeviceBackend:
         """Ask PortAudio to look at the devices again (it caches the list).
 
         WARNING: this closes every open stream. The engine calls it only when no route is running."""
+        self.meters.reset()
         try:
             self.sd._terminate()
             self.sd._initialize()
@@ -83,9 +90,13 @@ class FakeBackend:
         self.outputs = {}
         self.refreshes = 0
         self.refuse = set()        # device indexes that cannot be opened
+        self.peaks = {}            # device name -> [peak per channel]: what the fake system is playing
 
     def query(self):
         return [dict(d) for d in self.devices]
+
+    def endpoint_peaks(self, names):
+        return {n: self.peaks[n] for n in names if n in self.peaks}
 
     def refresh(self):
         self.refreshes += 1
