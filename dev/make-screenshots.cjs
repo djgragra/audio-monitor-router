@@ -20,7 +20,7 @@ const levels = { n1: -18, n2: -90, n3: -24, n4: -90, s1: -30, s2: -90, m1: -90, 
 
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM, args: ['--no-sandbox', '--allow-file-access-from-files'] });
-  const shot = async (name, { theme = 'dark', lang = 'en', action, width = 1100, height = 560 } = {}) => {
+  const shot = async (name, { theme = 'dark', lang = 'en', action, width = 1280, height = 800 } = {}) => {
     const p = await b.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
     await p.addInitScript(({ sources, dests, labels, theme, lang }) => {
       let settings = { version: 1, language: lang, theme, labels, hidden: [], routes: { o1: 'n1', h2: 'n3', o2: 's1' }, volumes: { o1: 80, h2: 60 },
@@ -44,9 +44,9 @@ const levels = { n1: -18, n2: -90, n3: -24, n4: -90, s1: -30, s2: -90, m1: -90, 
     await p.screenshot({ path: path.join(root, 'docs/screenshots', name) });
     await p.close();
   };
-  await shot('01-matrix.png', { height: 700 });
-  await shot('02-matrix-light-it.png', { theme: 'light', lang: 'it', height: 700 });
-  await shot('03-settings-devices.png', { height: 760, action: async (p) => { await p.click('#btnSettings'); await p.click('button.tab:nth-child(2)'); } });
-  await shot('04-settings-general.png', { height: 760, action: async (p) => { await p.click('#btnSettings'); } });
+  await shot('01-matrix.png', {});
+  await shot('02-matrix-light-it.png', { theme: 'light', lang: 'it' });
+  await shot('03-settings-devices.png', { action: async (p) => { await p.click('#btnSettings'); await p.click('button.tab:nth-child(2)'); } });
+  await shot('04-settings-general.png', { action: async (p) => { await p.click('#btnSettings'); } });
   await b.close();
 })();
