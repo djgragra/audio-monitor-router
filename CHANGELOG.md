@@ -1,5 +1,10 @@
 # Changelog
 
+## 26.10.1 (first public version, Windows)
+
+- First public version, same engine and interface as 0.2.4: a routing matrix for the audio devices of the computer (any input on any output, one source per output, several outputs at once), stereo pairs, mono and multi-channel devices split in pairs, volume and level for each output, signal speakers on sources and outputs, left/right mute and MONO, loop warning, three latency settings, your own names, order and hide list, notification area icon, English / Italiano / Español, dark and light theme.
+- New icon and screenshots.
+
 ## 0.2.4 (beta, Windows)
 
 - Fixed: the output speakers lit at first and then stopped after about 40 seconds. The meter process crashed (access violation) because of two mistakes in the code that handles Windows' COM objects: it released one reference too many, and it threw away and rebuilt all 32 meters every few seconds. Now the meters get a proper reference, they are rebuilt only when a device is really plugged in or removed, they are never released while the program runs, and the process ends without the clean-up that used to fail.
