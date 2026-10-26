@@ -1,5 +1,10 @@
 # Changelog
 
+## 26.10.2 (Windows)
+
+- New: the user manual, in English, Italian and Spanish, as three PDFs attached to the release (`Audio-Monitor-Router-Manual-<EN|IT|ES>-<version>.pdf`); the sources are in `docs/manual/`.
+- Fixed: the text at the top of *Settings → Devices* said the matrix updates by itself when a device is plugged in; while something is playing it appears after *Refresh devices*.
+
 ## 26.10.1 (first public version, Windows)
 
 - First public version, same engine and interface as 0.2.4: a routing matrix for the audio devices of the computer (any input on any output, one source per output, several outputs at once), stereo pairs, mono and multi-channel devices split in pairs, volume and level for each output, signal speakers on sources and outputs, left/right mute and MONO, loop warning, three latency settings, your own names, order and hide list, notification area icon, English / Italiano / Español, dark and light theme.

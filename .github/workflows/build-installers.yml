@@ -71,7 +71,27 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
 
-  # Windows only for now (beta). macOS is added when the Windows beta has been tried on a real machine.
+  # The user manual in English, Italian and Spanish, as three PDFs attached to the release (apps/STANDARD.md).
+  manuals:
+    needs: [check-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the three manuals
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p manuals
+          python3 docs/manual/build.py "$VERSION" manuals
+          ls -l manuals
+      - name: Upload manuals artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: audio-monitor-router-manuals
+          path: manuals/*.pdf
+          if-no-files-found: error
+          retention-days: 1
+
+  # Windows only for now. macOS is added when it has been tried on a real machine.
   build:
     needs: [check-version, test]
     runs-on: windows-latest
@@ -118,7 +138,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_version != '')
-    needs: build
+    needs: [build, manuals]
     runs-on: ubuntu-latest
     permissions:
       contents: write

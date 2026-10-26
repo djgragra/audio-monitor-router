@@ -2,7 +2,7 @@
 
 A routing matrix for the audio devices of your computer: choose which input you hear and on which output (headphones, monitors, HDMI, another sound card). One source per output, several outputs at the same time, a volume and a level meter for each. It works with any audio device the system exposes, including network audio cards such as Dante Virtual Soundcard receive pairs.
 
-**Status: first public version (26.10.1), Windows only.** Tried by the author on one Windows 11 PC with a USB audio interface, onboard audio, HDMI and Dante Virtual Soundcard; see *Not validated* below for what has not been tried. macOS is planned for a later version; Linux is not planned (the system already has routing tools). Not included: guided update and backup of settings.
+**Status: public version 26.10.2, Windows only.** Tried by the author on one Windows 11 PC with a USB audio interface, onboard audio, HDMI and Dante Virtual Soundcard; see *Not validated* below for what has not been tried. macOS is planned for a later version; Linux is not planned (the system already has routing tools). Not included: guided update and backup of settings.
 
 ## What it does
 
@@ -48,7 +48,7 @@ npm start                 # needs Python 3 with numpy, sounddevice and (Windows)
 
 ## Structure
 
-`main.js`, `preload.cjs` Electron main process and bridge · `renderer/` the interface · `src/` settings, engine client, logs, links · `engine/` the audio engine (Python, JSON lines) · `dev/` tests and generators (`make-icon.py`, `make-screenshots.cjs`) · `docs/screenshots/` · `docs/PROTOCOL.md` the protocol.
+`main.js`, `preload.cjs` Electron main process and bridge · `renderer/` the interface · `src/` settings, engine client, logs, links · `engine/` the audio engine (Python, JSON lines) · `docs/manual/` the user manual (English, Italian, Spanish; PDFs are attached to each release) · `dev/` tests and generators (`make-icon.py`, `make-screenshots.cjs`) · `docs/screenshots/` · `docs/PROTOCOL.md` the protocol.
 
 ## Credits
 
