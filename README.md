@@ -2,7 +2,7 @@
 
 A routing matrix for the audio devices of your computer: choose which input you hear and on which output (headphones, monitors, HDMI, another sound card). One source per output, several outputs at the same time, a volume and a level meter for each. It works with any audio device the system exposes, including network audio cards such as Dante Virtual Soundcard receive pairs.
 
-**Status: private beta in progress (0.1.0, Windows first). Not released.** The engine, the matrix and the first interface (matrix, volume, meters, names, hide, three languages, theme, Help & About) are written. Not yet: guided update, backup.
+**Status: first public version (26.10.1), Windows only.** Tried by the author on one Windows 11 PC with a USB audio interface, onboard audio, HDMI and Dante Virtual Soundcard; see *Not validated* below for what has not been tried. macOS is planned for a later version; Linux is not planned (the system already has routing tools). Not included: guided update and backup of settings.
 
 ## What it does
 
@@ -13,7 +13,7 @@ A routing matrix for the audio devices of your computer: choose which input you 
 
 ## Assumptions and limits
 
-- Routing between two different devices goes through a small buffer that follows the difference between their clocks, so it adds a delay (target 60 ms, **not measured on real hardware yet**). It is for monitoring, not for recording or live playout.
+- Routing between two different devices goes through a small buffer that follows the difference between their clocks, so it adds a delay (60 ms by default; three settings, 30, 60 and 120 ms; **not measured on real hardware**). It is for monitoring, not for recording or live playout.
 - On Windows only shared-mode (WASAPI) endpoints are used, so the app never takes a card away from other programs. Endpoints that Windows lists as separate pairs appear as separate rows; overlapping endpoints of the same card (for example "IN 1-2" and "IN 1-4") are all listed, and you can hide the ones you do not need.
 - A device plugged in while something is playing appears when you press *Refresh devices* (it restarts the running routes for a moment) or as soon as nothing is playing: PortAudio can only look at the devices again by closing every stream. A device that is unplugged is noticed at once, because its stream stops.
 - The speaker next to an output shows what ANY program plays on it, read from Windows' own level meter of the endpoint (through `pycaw`); it opens no stream, and it is read by a separate child process (`amr-engine --meters`) so that a COM problem cannot touch the audio. It matches the endpoint by its full name, so two devices with the same name may share a level. On systems other than Windows there is no output speaker.
@@ -31,28 +31,24 @@ A routing matrix for the audio devices of your computer: choose which input you 
 
 ### Not validated
 
-- The output speakers (`engine/amr_engine/endpoint_meter.py`): written against the pycaw interface and tested only with a fake; never run on a real Windows system.
+- Tried on **one** Windows 11 PC only (one USB interface, onboard audio, HDMI, Dante Virtual Soundcard). Other drivers, sound cards and computers: not tried.
+- Latency: the lowest setting without clicks has not been measured; long unattended runs have not been timed.
 - A device unplugged during playback: covered by a test with a fake device; not tried with a real one.
-- The signal speakers with many real inputs at once (for example sixteen network pairs): CPU load and behaviour not measured; the tests use a fake backend.
-- The latency settings (what is the lowest buffer without clicks) on any real machine.
-- The notification area icon, closing to it, and start at sign-in on Windows: opened in Electron on Linux with a virtual display only.
-
-- The interface was opened in Electron on Linux (virtual display, no sound card) and in a browser with a fake engine; never with real devices.
-- Real audio on any system: the engine tests use a fake backend. The earlier prototype was reported working on the author's Windows PC only.
-- Latency, long unattended runs, other drivers and other computers.
-- macOS and Linux (Linux is not planned: the system already has routing tools).
+- The signal speakers with many real inputs at once (for example sixteen network pairs): CPU load not measured.
+- The notification area icon, closing to it, and start at sign-in on Windows: tried in Electron on Linux with a virtual display only.
+- macOS: not built, not tried. Linux: not planned.
 
 ## Run locally
 
 ```
 npm install
 npm test
-npm start                 # needs Python 3 with numpy and sounddevice (pip install -r engine/requirements.txt)
+npm start                 # needs Python 3 with numpy, sounddevice and (Windows) pycaw: pip install -r engine/requirements.txt
 ```
 
 ## Structure
 
-`main.js`, `preload.cjs` Electron main process and bridge · `renderer/` the interface · `src/` settings, engine client, logs, links · `engine/` the audio engine (Python, JSON lines) · `dev/` tests · `docs/PROTOCOL.md` the protocol.
+`main.js`, `preload.cjs` Electron main process and bridge · `renderer/` the interface · `src/` settings, engine client, logs, links · `engine/` the audio engine (Python, JSON lines) · `dev/` tests and generators (`make-icon.py`, `make-screenshots.cjs`) · `docs/screenshots/` · `docs/PROTOCOL.md` the protocol.
 
 ## Credits
 
