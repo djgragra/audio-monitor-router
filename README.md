@@ -38,6 +38,8 @@ A routing matrix for the audio devices of your computer: choose which input you 
 - The notification area icon, closing to it, and start at sign-in on Windows: tried in Electron on Linux with a virtual display only.
 - macOS: not built, not tried. Linux: not planned.
 
+<a href="https://ko-fi.com/F8V328ADFH"><img height="36" src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Buy Me a Coffee at ko-fi.com"></a>
+
 ## Run locally
 
 ```
@@ -59,3 +61,11 @@ NumPy (BSD-3-Clause), python-sounddevice (MIT) with PortAudio (MIT-style). Elect
 Una matrice di ascolto per le schede audio del computer: scegli quale ingresso ascoltare e su quale uscita. L'app legge le schede che trova sulla macchina; una scheda tolta sparisce. Nomi personalizzati e nascondi sono scelte tue. Versione beta, prima Windows; non ancora pubblicata.
 
 MIT License · Graziano Melzi · OnAir Garage · hello@onairgarage.com
+
+## Support
+
+This tool is free and will stay free, with source code. If it saved your day, you can leave a tip on Ko-fi: a thank-you, nothing more.
+
+<a href="https://ko-fi.com/F8V328ADFH"><img height="36" src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Buy Me a Coffee at ko-fi.com"></a>
+
+*Italiano:* lo strumento è gratuito e resta tale, con il codice sorgente. Se ti ha salvato la giornata puoi lasciare una mancia su Ko-fi: un grazie e basta.
